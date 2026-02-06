@@ -24,3 +24,6 @@ vendor/
 
 # Cursor IDE
 .cursor/
+
+# env
+.env
