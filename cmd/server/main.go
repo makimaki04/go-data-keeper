@@ -21,10 +21,10 @@ import (
 	"go.uber.org/zap"
 )
 
-var loggerCfgPath  = "configs/logger.json"
+var loggerCfgPath = "configs/logger.json"
 
 func main() {
-	logger, err := logger.NewLogger(loggerCfgPath )
+	logger, err := logger.NewLogger(loggerCfgPath)
 	if err != nil {
 		log.Fatalf("failed to init logger: %v", err)
 	}
@@ -53,6 +53,8 @@ func main() {
 			r.Post("/login", handler.LoginUser)
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.WithAuth(cfg.JWTSecret, logger))
+				r.Put("/items/{id}", handler.SetItem)
+				r.Delete("/items/{id}", handler.DeleteItem)
 			})
 		})
 	})

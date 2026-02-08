@@ -7,7 +7,7 @@ type RegisterRequest struct {
 
 type RegisterResponse struct {
 	ID        string `json:"id"`
-	JWTToken  string `json:"jwt-token"`
+	JWTToken  string `json:"jwt_token"`
 	ExpiresAt string `json:"expires_at"`
 }
 
@@ -17,7 +17,6 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	JWTToken  string `json:"jwt-token"`
+	JWTToken  string `json:"jwt_token"`
 	ExpiresAt string `json:"expires_at"`
 }
-

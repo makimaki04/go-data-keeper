@@ -9,7 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/makimaki04/go-data-keeper.git/internal/dto"
+	"github.com/makimaki04/go-data-keeper.git/internal/middleware"
+	"github.com/makimaki04/go-data-keeper.git/internal/models"
 	"github.com/makimaki04/go-data-keeper.git/internal/repository"
 	"github.com/makimaki04/go-data-keeper.git/internal/service"
 	"go.uber.org/zap"
@@ -121,6 +125,7 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 			respondWithError(w, http.StatusUnauthorized, "wrong login or password", h.logger)
 			return
 		}
+		
 		respondWithError(w, http.StatusInternalServerError, "internal server error", h.logger)
 		return
 	}
@@ -146,6 +151,99 @@ func checkAuthData(login string, password string) (string, string, error) {
 	}
 
 	return login, password, nil
+}
+
+func (h *Handler) SetItem(w http.ResponseWriter, r *http.Request) {
+	req, err := parseJSONBody[dto.SetItemRequest](w, r, MaxBodyJSON, h.logger)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error(), h.logger)
+		return
+	}
+
+	itemId, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "wrong url params", h.logger)
+		return
+	}
+
+	userID, ok := middleware.GetUserID(r)
+	if !ok {
+		h.logger.Warnw("couldn't get userID", "op", "set_item")
+		respondWithError(w, http.StatusInternalServerError, "internal server error", h.logger)
+		return
+	}
+
+	item := models.Item{
+		ID:         itemId,
+		UserID:     userID,
+		Type:       req.Type,
+		Ciphertext: req.Ciphertext,
+		Nonce:      req.Nonce,
+		AAD:        req.AAD,
+	}
+
+	ctx := r.Context()
+	id, updatetRev, err := h.service.SetItem(ctx, item)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondWithError(w, http.StatusNotFound, repository.ErrNotFound.Error(), h.logger)
+			return
+		}
+
+		if errors.Is(err, repository.ErrUserMissing) {
+			respondWithError(w, http.StatusUnauthorized, repository.ErrUserMissing.Error(), h.logger)
+			return
+		}
+
+		respondWithError(w, http.StatusInternalServerError, "internal server error", h.logger)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	encodeResponse(w, dto.SetItemResponse{
+		ID:         id,
+		UpdatedRev: updatetRev,
+	}, h.logger)
+}
+
+func (h *Handler) DeleteItem(w http.ResponseWriter, r *http.Request) {
+	itemID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "wron url params", h.logger)
+		return
+	}
+
+	userID, ok := middleware.GetUserID(r)
+	if !ok {
+		h.logger.Warnw("couldn't get userID", "op", "delete_item")
+		respondWithError(w, http.StatusInternalServerError, "internal server error", h.logger)
+		return
+	}
+
+	ctx := r.Context()
+	id, updatetRev, err := h.service.DeleteItem(ctx, itemID, userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondWithError(w, http.StatusNotFound, repository.ErrNotFound.Error(), h.logger)
+			return
+		}
+
+		if errors.Is(err, repository.ErrUserMissing) {
+			respondWithError(w, http.StatusUnauthorized, repository.ErrUserMissing.Error(), h.logger)
+			return
+		}
+
+		respondWithError(w, http.StatusInternalServerError, "internal server error", h.logger)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	encodeResponse(w, dto.DeleteItemResponse{
+		ID:         id,
+		UpdatedRev: updatetRev,
+	}, h.logger)
 }
 
 func respondWithError(w http.ResponseWriter, code int, message string, logger *zap.SugaredLogger) {
