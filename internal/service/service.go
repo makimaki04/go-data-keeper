@@ -10,14 +10,17 @@ import (
 )
 
 type Authorization interface {
-	RegisterUser(ctx context.Context, login string, password string) (id uuid.UUID, accessToken JWTToken, err error)
-	LoginUser(ctx context.Context, login string, password string) (accessToken JWTToken, err error)
+	RegisterUser(ctx context.Context, login string, password string) (AuthData, error)
+	LoginUser(ctx context.Context, login string, password string) (AuthData, error)
 	GenerateToken(id uuid.UUID) (accessToken JWTToken, err error)
 }
 
 type Items interface {
 	SetItem(ctx context.Context, item models.Item) (id uuid.UUID, updatedRev int64, err error)
 	DeleteItem(ctx context.Context, itemID uuid.UUID, userID uuid.UUID) (id uuid.UUID, updatedRev int64, err error)
+	GetItem(ctx context.Context, itemID uuid.UUID, userID uuid.UUID) (models.Item, error)
+	GetAllItems(ctx context.Context, userID uuid.UUID) ([]models.Item, error)
+	GetChangesSince(ctx context.Context, userID uuid.UUID, since int64) ([]models.Item, int64, error)
 }
 
 type Service struct {
@@ -28,6 +31,6 @@ type Service struct {
 func NewService(repo *repository.Repository, secret string, logger *zap.SugaredLogger) *Service {
 	return &Service{
 		Authorization: NewAuthService(repo.Authorization, secret, logger),
-		Items: NewItemService(repo.Items, logger),
+		Items:         NewItemService(repo.Items, logger),
 	}
 }

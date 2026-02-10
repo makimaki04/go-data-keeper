@@ -70,3 +70,74 @@ func (s *ItemService) DeleteItem(ctx context.Context, itemID uuid.UUID, userID u
 
 	return id, updatedRev, nil
 }
+
+func (s *ItemService) GetItem(ctx context.Context, itemID uuid.UUID, userID uuid.UUID) (models.Item, error) {
+	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
+	defer cancel()
+
+	item, err := s.repo.GetItem(ctx, itemID, userID)
+	if err != nil {
+		s.logger.Errorw("get item error",
+			"op", "item.get_item",
+			"err", err,
+			"item", itemID,
+			"user", userID,
+		)
+		return models.Item{}, err
+	}
+
+	s.logger.Infow("get item succeeded",
+		"op", "item.get_item",
+		"item", itemID,
+		"user", userID,
+	)
+
+	return item, nil
+}
+
+func (s *ItemService) GetAllItems(ctx context.Context, userID uuid.UUID) ([]models.Item, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	items, err := s.repo.GetAllItems(ctx, userID)
+	if err != nil {
+		s.logger.Errorw("get all items error",
+			"op", "item.get_all_items",
+			"err", err,
+			"user", userID,
+		)
+		return nil, err
+	}
+
+	s.logger.Infow("get all items succeeded",
+		"op", "item.get_all_items",
+		"user", userID,
+		"count", len(items),
+	)
+
+	return items, nil
+}
+
+func (s *ItemService) GetChangesSince(ctx context.Context, userID uuid.UUID, since int64) ([]models.Item, int64, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	items, rev, err := s.repo.GetChangesSince(ctx, userID, since)
+	if err != nil {
+		s.logger.Errorw("get changes since error",
+			"op", "item.get_changes_since",
+			"err", err,
+			"user", userID,
+		)
+
+		return []models.Item{}, 0, err
+	}
+
+	s.logger.Infow("get chenges since succeeded",
+		"op", "item.get_changes_since",
+		"user", userID,
+		"count", len(items),
+	)
+
+	return items, rev, nil
+}

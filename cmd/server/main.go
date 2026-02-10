@@ -53,8 +53,15 @@ func main() {
 			r.Post("/login", handler.LoginUser)
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.WithAuth(cfg.JWTSecret, logger))
-				r.Put("/items/{id}", handler.SetItem)
-				r.Delete("/items/{id}", handler.DeleteItem)
+				r.Route("/items", func(r chi.Router) {
+					r.Get("/", handler.GetAllItems)
+					r.Get("/{id}", handler.GetItem)
+					r.Put("/{id}", handler.SetItem)
+					r.Delete("/{id}", handler.DeleteItem)
+				})
+				r.Route("/sync", func(r chi.Router) {
+					r.Get("/changes", handler.GetChangesSince)
+				})
 			})
 		})
 	})

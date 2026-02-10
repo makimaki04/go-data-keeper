@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"time"
@@ -30,7 +31,14 @@ func NewAuthService(repo repository.Authorization, secret string, logger *zap.Su
 	}
 }
 
-func (s *AuthService) RegisterUser(ctx context.Context, login string, password string) (id uuid.UUID, accessToken JWTToken, err error) {
+type AuthData struct {
+	ID        uuid.UUID
+	JWT       JWTToken
+	KDFSalt   []byte
+	KDFParams models.Params
+}
+
+func (s *AuthService) RegisterUser(ctx context.Context, login string, password string) (AuthData, error) {
 	passHash, err := generatePasswordHash(password)
 	if err != nil {
 		s.logger.Errorw("couldn't generate password hash",
@@ -38,18 +46,31 @@ func (s *AuthService) RegisterUser(ctx context.Context, login string, password s
 			"error", err,
 		)
 
-		return uuid.Nil, JWTToken{}, err
+		return AuthData{}, err
+	}
+
+	salt, params, err := s.generateKDF()
+	if err != nil {
+		s.logger.Warnw("registration failed",
+			"op", "auth.user_register",
+			"login", login,
+			"error", repository.ErrUserExists,
+		)
+
+		return AuthData{}, err
 	}
 
 	user := models.User{
 		Login:        login,
 		PasswordHash: passHash,
+		KdfSalt:      salt,
+		KdfParams:    params,
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 	defer cancel()
 
-	id, err = s.repo.RegisterUser(ctx, user)
+	id, err := s.repo.RegisterUser(ctx, user)
 	if err != nil {
 		if err == repository.ErrUserExists {
 			s.logger.Warnw("registration failed",
@@ -58,7 +79,7 @@ func (s *AuthService) RegisterUser(ctx context.Context, login string, password s
 				"error", repository.ErrUserExists,
 			)
 
-			return uuid.Nil, JWTToken{}, repository.ErrUserExists
+			return AuthData{}, repository.ErrUserExists
 		}
 
 		s.logger.Errorw("registration failed",
@@ -67,7 +88,7 @@ func (s *AuthService) RegisterUser(ctx context.Context, login string, password s
 			"error", err,
 		)
 
-		return uuid.Nil, JWTToken{}, fmt.Errorf("user register error: %w", err)
+		return AuthData{}, fmt.Errorf("user register error: %w", err)
 	}
 
 	token, err := s.GenerateToken(id)
@@ -77,7 +98,14 @@ func (s *AuthService) RegisterUser(ctx context.Context, login string, password s
 			"login", login,
 			"error", err,
 		)
-		return uuid.Nil, JWTToken{}, fmt.Errorf("token generated error: %w", err)
+		return AuthData{}, fmt.Errorf("token generated error: %w", err)
+	}
+
+	data := AuthData{
+		ID:        id,
+		JWT:       token,
+		KDFSalt:   salt,
+		KDFParams: params,
 	}
 
 	s.logger.Infow("user registered",
@@ -86,7 +114,7 @@ func (s *AuthService) RegisterUser(ctx context.Context, login string, password s
 		"user_id", id,
 	)
 
-	return id, token, nil
+	return data, nil
 }
 
 func generatePasswordHash(password string) (string, error) {
@@ -100,7 +128,7 @@ func generatePasswordHash(password string) (string, error) {
 
 var ErrInvalidCredentials = errors.New("invalid login or password")
 
-func (s *AuthService) LoginUser(ctx context.Context, login string, password string) (accessToken JWTToken, err error) {
+func (s *AuthService) LoginUser(ctx context.Context, login string, password string) (AuthData, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 	defer cancel()
 
@@ -113,7 +141,7 @@ func (s *AuthService) LoginUser(ctx context.Context, login string, password stri
 				"error", err,
 			)
 
-			return JWTToken{}, repository.ErrUserNotFound
+			return AuthData{}, repository.ErrUserNotFound
 		}
 
 		s.logger.Errorw("couldn't get user from db",
@@ -122,7 +150,7 @@ func (s *AuthService) LoginUser(ctx context.Context, login string, password stri
 			"error", err,
 		)
 
-		return JWTToken{}, fmt.Errorf("user login error: %w", err)
+		return AuthData{}, fmt.Errorf("user login error: %w", err)
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(userDB.PasswordHash), []byte(password)); err != nil {
@@ -132,7 +160,7 @@ func (s *AuthService) LoginUser(ctx context.Context, login string, password stri
 			"error", err,
 		)
 
-		return JWTToken{}, ErrInvalidCredentials
+		return AuthData{}, ErrInvalidCredentials
 	}
 
 	token, err := s.GenerateToken(userDB.ID)
@@ -142,7 +170,14 @@ func (s *AuthService) LoginUser(ctx context.Context, login string, password stri
 			"login", login,
 			"error", err,
 		)
-		return JWTToken{}, fmt.Errorf("generate token error: %w", err)
+		return AuthData{}, fmt.Errorf("generate token error: %w", err)
+	}
+
+	data := AuthData{
+		ID:        userDB.ID,
+		JWT:       token,
+		KDFSalt:   userDB.KdfSalt,
+		KDFParams: userDB.KdfParams,
 	}
 
 	s.logger.Infow("user logged in",
@@ -151,7 +186,7 @@ func (s *AuthService) LoginUser(ctx context.Context, login string, password stri
 		"login", userDB.Login,
 	)
 
-	return token, nil
+	return data, nil
 }
 
 type JWTToken struct {
@@ -189,4 +224,26 @@ func (s *AuthService) GenerateToken(id uuid.UUID) (accessToken JWTToken, err err
 		AccessToken: tokenStr,
 		ExpiresAt:   expTime,
 	}, nil
+}
+
+var kdf_params = models.Params{
+	Algorithm:   "argon2id",
+	KeyLen:      32,
+	SaltLen:     16,
+	Time:        3,
+	Memory:      64 * 1024,
+	Parallelism: 2,
+}
+
+func (s *AuthService) generateKDF() (kdfSalt []byte, kdfParams models.Params, err error) {
+	kdfSalt = make([]byte, kdf_params.SaltLen)
+	_, err = rand.Read(kdfSalt)
+	if err != nil {
+		s.logger.Warnw("generate salt error", "op", "generate_kdf")
+		return nil, models.Params{}, err
+	}
+
+	kdfParams = kdf_params
+
+	return kdfSalt, kdfParams, nil
 }

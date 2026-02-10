@@ -15,12 +15,12 @@ import (
 
 const (
 	insertUserQuery = `
-		INSERT INTO users (login, password_hash)
-		VALUES ($1, $2)
+		INSERT INTO users (login, password_hash, kdf_salt, kdf_params)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id
 	`
 	selectUserQuery = `
-		SELECT id, login, password_hash
+		SELECT id, login, password_hash, kdf_salt, kdf_params
 		FROM users
 		WHERE login = $1
 	`
@@ -82,7 +82,12 @@ func (r *AuthRepository) RegisterUser(ctx context.Context, user models.User) (uu
 		}
 	}()
 
-	err = tx.QueryRowContext(ctx, insertUserQuery, user.Login, user.PasswordHash).Scan(&id)
+	err = tx.QueryRowContext(ctx, insertUserQuery,
+		user.Login,
+		user.PasswordHash,
+		user.KdfSalt,
+		user.KdfParams,
+	).Scan(&id)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
@@ -110,7 +115,7 @@ func (r *AuthRepository) RegisterUser(ctx context.Context, user models.User) (uu
 func (r *AuthRepository) LoginUser(ctx context.Context, login string) (models.User, error) {
 	var user models.User
 
-	err := r.db.QueryRowContext(ctx, selectUserQuery, login).Scan(&user.ID, &user.Login, &user.PasswordHash)
+	err := r.db.QueryRowContext(ctx, selectUserQuery, login).Scan(&user.ID, &user.Login, &user.PasswordHash, &user.KdfSalt, &user.KdfParams)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			r.logger.Errorw("user not found",

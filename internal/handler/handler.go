@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -84,7 +85,7 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	id, token, err := h.service.RegisterUser(ctx, login, password)
+	authData, err := h.service.RegisterUser(ctx, login, password)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserExists) {
 			respondWithError(w, http.StatusConflict, repository.ErrUserExists.Error(), h.logger)
@@ -96,12 +97,14 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+	w.Header().Set("Authorization", fmt.Sprintf("Bearer %s", authData.JWT.AccessToken))
 	w.WriteHeader(http.StatusOK)
 	encodeResponse(w, dto.RegisterResponse{
-		ID:        id.String(),
-		JWTToken:  token.AccessToken,
-		ExpiresAt: token.ExpiresAt.Format(time.UnixDate),
+		ID:        authData.ID.String(),
+		JWTToken:  authData.JWT.AccessToken,
+		ExpiresAt: authData.JWT.ExpiresAt.Format(time.UnixDate),
+		KDFSalt:   authData.KDFSalt,
+		KDFParams: authData.KDFParams,
 	}, h.logger)
 }
 
@@ -119,23 +122,25 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	token, err := h.service.LoginUser(ctx, login, password)
+	authData, err := h.service.LoginUser(ctx, login, password)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) || errors.Is(err, service.ErrInvalidCredentials) {
 			respondWithError(w, http.StatusUnauthorized, "wrong login or password", h.logger)
 			return
 		}
-		
+
 		respondWithError(w, http.StatusInternalServerError, "internal server error", h.logger)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+	w.Header().Set("Authorization", fmt.Sprintf("Bearer %s", authData.JWT.AccessToken))
 	w.WriteHeader(http.StatusOK)
 	encodeResponse(w, dto.LoginResponse{
-		JWTToken:  token.AccessToken,
-		ExpiresAt: token.ExpiresAt.Format(time.UnixDate),
+		JWTToken:  authData.JWT.AccessToken,
+		ExpiresAt: authData.JWT.ExpiresAt.Format(time.UnixDate),
+		KDFSalt:   authData.KDFSalt,
+		KDFParams: authData.KDFParams,
 	}, h.logger)
 }
 
@@ -244,6 +249,132 @@ func (h *Handler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 		ID:         id,
 		UpdatedRev: updatetRev,
 	}, h.logger)
+}
+
+func (h *Handler) GetItem(w http.ResponseWriter, r *http.Request) {
+	itemID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "wrong url params", h.logger)
+		return
+	}
+
+	userID, ok := middleware.GetUserID(r)
+	if !ok {
+		h.logger.Warnw("couldn't get userID", "op", "get_item")
+		respondWithError(w, http.StatusInternalServerError, "internal server error", h.logger)
+		return
+	}
+
+	ctx := r.Context()
+	item, err := h.service.GetItem(ctx, itemID, userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondWithError(w, http.StatusNotFound, repository.ErrNotFound.Error(), h.logger)
+			return
+		}
+		if errors.Is(err, repository.ErrUserMissing) {
+			respondWithError(w, http.StatusUnauthorized, repository.ErrUserMissing.Error(), h.logger)
+			return
+		}
+		respondWithError(w, http.StatusInternalServerError, "internal server error", h.logger)
+		return
+	}
+
+	var updatedAt *time.Time
+	if item.UpdatedAt.Valid {
+		t := item.UpdatedAt.Time
+		updatedAt = &t
+	}
+
+	resp := dto.GetItemResponse{
+		Item: dto.ItemDTO{
+			ID:         item.ID,
+			Type:       item.Type,
+			Ciphertext: item.Ciphertext,
+			Nonce:      item.Nonce,
+			AAD:        item.AAD,
+			Deleted:    item.Deleted,
+			UpdatedRev: item.UpdatedRev,
+			CreatedAt:  item.CreatedAt,
+			UpdatedAt:  updatedAt,
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	encodeResponse(w, resp, h.logger)
+}
+
+func (h *Handler) GetAllItems(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r)
+	if !ok {
+		h.logger.Warnw("couldn't get userID", "op", "get_all_items")
+		respondWithError(w, http.StatusInternalServerError, "internal server error", h.logger)
+		return
+	}
+
+	ctx := r.Context()
+	items, err := h.service.GetAllItems(ctx, userID)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserMissing) {
+			respondWithError(w, http.StatusUnauthorized, repository.ErrUserMissing.Error(), h.logger)
+			return
+		}
+		respondWithError(w, http.StatusInternalServerError, "internal server error", h.logger)
+		return
+	}
+
+	resp := dto.ConvertToItemsDTO(items)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	encodeResponse(w, dto.GetAllItemsResponse{Items: resp}, h.logger)
+}
+
+func (h *Handler) GetChangesSince(w http.ResponseWriter, r *http.Request) {
+	sinceStr := r.URL.Query().Get("since")
+	var since int64 = 0
+	if sinceStr != "" {
+		v, err := strconv.ParseInt(sinceStr, 10, 64)
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, "wrong since rev format", h.logger)
+			return
+		}
+		since = v
+	}
+
+	if since < 0 {
+		respondWithError(w, http.StatusBadRequest, "since rev can't be negative", h.logger)
+		return
+	}
+
+	userID, ok := middleware.GetUserID(r)
+	if !ok {
+		h.logger.Warnw("couldn't get userID", "op", "get_changes_since")
+		respondWithError(w, http.StatusInternalServerError, "internal server error", h.logger)
+		return
+	}
+
+	ctx := r.Context()
+	items, rev, err := h.service.GetChangesSince(ctx, userID, since)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserMissing) {
+			respondWithError(w, http.StatusUnauthorized, repository.ErrUserMissing.Error(), h.logger)
+			return
+		}
+		respondWithError(w, http.StatusInternalServerError, "internal server error", h.logger)
+		return
+	}
+
+	out := dto.ConvertToItemsDTO(items)
+	resp := dto.SyncItemsResponse{
+		LatestRev: rev,
+		Items:     out,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	encodeResponse(w, resp, h.logger)
 }
 
 func respondWithError(w http.ResponseWriter, code int, message string, logger *zap.SugaredLogger) {

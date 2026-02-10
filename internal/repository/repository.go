@@ -17,6 +17,9 @@ type Authorization interface {
 type Items interface {
 	SetItem(ctx context.Context, item models.Item) (id uuid.UUID, updatedRev int64, err error)
 	DeleteItem(ctx context.Context, itemID uuid.UUID, userID uuid.UUID) (id uuid.UUID, updatedRev int64, err error)
+	GetItem(ctx context.Context, itemID uuid.UUID, userID uuid.UUID) (models.Item, error)
+	GetAllItems(ctx context.Context, userID uuid.UUID) ([]models.Item, error)
+	GetChangesSince(ctx context.Context, userID uuid.UUID, since int64) ([]models.Item, int64, error)
 }
 
 type Repository struct {
@@ -27,6 +30,6 @@ type Repository struct {
 func NewRepository(db *sql.DB, logger *zap.SugaredLogger) *Repository {
 	return &Repository{
 		Authorization: NewAuthRepository(db, logger),
-		Items: NewItemRepository(db, logger),
+		Items:         NewItemRepository(db, logger),
 	}
 }

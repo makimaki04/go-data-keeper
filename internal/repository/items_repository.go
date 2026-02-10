@@ -70,6 +70,28 @@ const (
 		WHERE id = $1 AND user_id = $2
 		RETURNING updated_rev;
 	`
+	getItemQuery = `
+		SELECT id, user_id, type, ciphertext, nonce, aad, deleted, updated_rev,  created_at, updated_at
+		FROM items
+		WHERE user_id = $1 AND id = $2 
+	`
+	getAllItemsQuery = `
+		SELECT id, user_id, type, ciphertext, nonce, aad, deleted, updated_rev,  created_at, updated_at
+		FROM items
+		WHERE user_id = $1
+		ORDER BY updated_rev ASC
+	`
+	getUserLatestRevQuery = `
+		SELECT current_rev
+		from users
+		WHERE id = $1
+	`
+	getItemsSinceRevQuery = `
+		SELECT id, user_id, type, ciphertext, nonce, aad, deleted, updated_rev,  created_at, updated_at
+		FROM items
+		WHERE user_id = $1 AND updated_rev > $2
+		ORDER BY updated_rev ASC
+	`
 )
 
 type ItemRepository struct {
@@ -171,6 +193,156 @@ func (r *ItemRepository) DeleteItem(ctx context.Context, itemID uuid.UUID, userI
 	}
 
 	return id, updatedRev, err
+}
+
+func (r *ItemRepository) GetItem(ctx context.Context, itemID uuid.UUID, userID uuid.UUID) (models.Item, error) {
+	var item models.Item
+
+	err := r.db.QueryRowContext(ctx, getItemQuery, userID, itemID).Scan(
+		&item.ID,
+		&item.UserID,
+		&item.Type,
+		&item.Ciphertext,
+		&item.Nonce,
+		&item.AAD,
+		&item.Deleted,
+		&item.UpdatedRev,
+		&item.CreatedAt,
+		&item.UpdatedAt,
+	)
+	if err != nil {
+		err = checkErr(err, r.logger, "get_item")
+		return models.Item{}, err
+	}
+
+	return item, nil
+}
+
+func (r *ItemRepository) GetAllItems(ctx context.Context, userID uuid.UUID) ([]models.Item, error) {
+	rows, err := r.db.QueryContext(ctx, getAllItemsQuery, userID)
+	if err != nil {
+		err = checkErr(err, r.logger, "get_all_items.query")
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]models.Item, 0)
+	for rows.Next() {
+		var item models.Item
+		if err := rows.Scan(
+			&item.ID,
+			&item.UserID,
+			&item.Type,
+			&item.Ciphertext,
+			&item.Nonce,
+			&item.AAD,
+			&item.Deleted,
+			&item.UpdatedRev,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+		); err != nil {
+			err = checkErr(err, r.logger, "get_all_items.scan")
+			return nil, err
+		}
+
+		items = append(items, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		err = checkErr(err, r.logger, "get_all_items.rows")
+		return nil, err
+	}
+
+	return items, nil
+}
+
+func (r *ItemRepository) GetChangesSince(ctx context.Context, userID uuid.UUID, since int64) (items []models.Item, latestRev int64, err error) {
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{
+		ReadOnly: true,
+	})
+	if err != nil {
+		r.logger.Errorw("begin get changes transaction error",
+			"op", "get_changes_since",
+			"err", err,
+		)
+
+		return []models.Item{}, 0, fmt.Errorf("failed to start get_changes transaction: %v", err)
+	}
+
+	defer func() {
+		if p := recover(); p != nil {
+			_ = tx.Rollback()
+			r.logger.Warnw("transaction rolled back", "op", "get_changes_since")
+			panic(p)
+		} else if err != nil {
+			_ = tx.Rollback()
+
+			r.logger.Warnw("transaction rolled back",
+				"op", "get_changes_since",
+				"error", err,
+			)
+		} else {
+			if commitErr := tx.Commit(); commitErr != nil {
+				r.logger.Errorw("failed to commit transaction",
+					"op", "get_changes_since",
+					"error", commitErr,
+				)
+
+				err = fmt.Errorf("transaction commit error: %w", commitErr)
+			}
+		}
+	}()
+
+	err = tx.QueryRowContext(ctx, getUserLatestRevQuery, userID).Scan(&latestRev)
+	if err != nil {
+		err = checkErr(err, r.logger, "get_changes_since")
+		return []models.Item{}, 0, err
+	}
+
+	if latestRev == 0 {
+		r.logger.Infow("user has not revs", "user", userID)
+		return []models.Item{}, latestRev, nil
+	}
+
+	if since >= latestRev {
+		r.logger.Infow("user has not new revs", "user", userID)
+		return []models.Item{}, latestRev, nil
+	}
+
+	rows, err := tx.QueryContext(ctx, getItemsSinceRevQuery, userID, since)
+	if err != nil {
+		err = checkErr(err, r.logger, "get_changes_since")
+		return []models.Item{}, 0, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var item models.Item
+		if err := rows.Scan(
+			&item.ID,
+			&item.UserID,
+			&item.Type,
+			&item.Ciphertext,
+			&item.Nonce,
+			&item.AAD,
+			&item.Deleted,
+			&item.UpdatedRev,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+		); err != nil {
+			err = checkErr(err, r.logger, "get_changes_since")
+			return []models.Item{}, 0, err
+		}
+
+		items = append(items, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		err = checkErr(err, r.logger, "get_changes_since.rows")
+		return []models.Item{}, 0, err
+	}
+
+	return items, latestRev, nil
 }
 
 func checkErr(err error, logger *zap.SugaredLogger, op string) error {
