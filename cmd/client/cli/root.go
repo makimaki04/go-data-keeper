@@ -1,30 +1,54 @@
 /*
 Copyright © 2026 Dima <goodd214080@gmail.com>
-
 */
 package cli
 
 import (
+	"context"
 	"os"
 
+	"github.com/makimaki04/go-data-keeper.git/internal/clientapi"
+	"github.com/makimaki04/go-data-keeper.git/internal/clientapp"
+	"github.com/makimaki04/go-data-keeper.git/internal/clientstate"
+	"github.com/makimaki04/go-data-keeper.git/internal/logger"
 	"github.com/spf13/cobra"
 )
 
+var (
+	loggerCfgPath = "configs/logger.json"
+	serverURL     string
+	statePath     string
+	vaultPath     string
+)
 
+type appKey struct{}
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "client",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
+	Short: "go-data-keeper is a securely store system",
+	Long: `go-data-keeper is a client-server system 
+	that allows users to securely store 
+	usernames, passwords, binary data, and other private information.`,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		logger, err := logger.NewLogger(loggerCfgPath)
+		if err != nil {
+			return err
+		}
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+		store, err := clientstate.NewStore(statePath, vaultPath, logger)
+		if err != nil {
+			return err
+		}
+
+		api := clientapi.NewHTTPClient(serverURL, logger)
+
+		app := clientapp.NewApp(api, *store, logger)
+
+		cmd.SetContext(context.WithValue(cmd.Context(), appKey{}, app))
+
+		return nil
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -45,7 +69,11 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
+	rootCmd.AddCommand(registerCmd)
+	rootCmd.AddCommand(loginCmd)
+
+	rootCmd.PersistentFlags().StringVar(&serverURL, "server", "http://127.0.0.1:8080", "Server URL")
+	rootCmd.PersistentFlags().StringVar(&statePath, "state", "D:\\prog\\data\\gophkeeper\\state.json", "State file path")
+	rootCmd.PersistentFlags().StringVar(&vaultPath, "vault", "D:\\prog\\data\\gophkeeper\\vault.json", "Vault file path")
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
-
-

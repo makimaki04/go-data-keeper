@@ -12,7 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/makimaki04/go-data-keeper.git/internal/dto"
+	"github.com/makimaki04/go-data-keeper.git/cmd/pkg/contract"
 	"github.com/makimaki04/go-data-keeper.git/internal/middleware"
 	"github.com/makimaki04/go-data-keeper.git/internal/models"
 	"github.com/makimaki04/go-data-keeper.git/internal/repository"
@@ -72,7 +72,7 @@ func parseJSONBody[T any](w http.ResponseWriter, r *http.Request, MaxBytesRead i
 }
 
 func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
-	req, err := parseJSONBody[dto.RegisterRequest](w, r, MaxBodyAuth, h.logger)
+	req, err := parseJSONBody[contract.RegisterRequest](w, r, MaxBodyAuth, h.logger)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error(), h.logger)
 		return
@@ -99,7 +99,7 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Authorization", fmt.Sprintf("Bearer %s", authData.JWT.AccessToken))
 	w.WriteHeader(http.StatusOK)
-	encodeResponse(w, dto.RegisterResponse{
+	encodeResponse(w, contract.RegisterResponse{
 		ID:        authData.ID.String(),
 		JWTToken:  authData.JWT.AccessToken,
 		ExpiresAt: authData.JWT.ExpiresAt.Format(time.UnixDate),
@@ -109,7 +109,7 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
-	req, err := parseJSONBody[dto.LoginRequest](w, r, MaxBodyAuth, h.logger)
+	req, err := parseJSONBody[contract.LoginRequest](w, r, MaxBodyAuth, h.logger)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error(), h.logger)
 		return
@@ -136,7 +136,7 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Authorization", fmt.Sprintf("Bearer %s", authData.JWT.AccessToken))
 	w.WriteHeader(http.StatusOK)
-	encodeResponse(w, dto.LoginResponse{
+	encodeResponse(w, contract.LoginResponse{
 		JWTToken:  authData.JWT.AccessToken,
 		ExpiresAt: authData.JWT.ExpiresAt.Format(time.UnixDate),
 		KDFSalt:   authData.KDFSalt,
@@ -159,7 +159,7 @@ func checkAuthData(login string, password string) (string, string, error) {
 }
 
 func (h *Handler) SetItem(w http.ResponseWriter, r *http.Request) {
-	req, err := parseJSONBody[dto.SetItemRequest](w, r, MaxBodyJSON, h.logger)
+	req, err := parseJSONBody[contract.SetItemRequest](w, r, MaxBodyJSON, h.logger)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error(), h.logger)
 		return
@@ -206,7 +206,7 @@ func (h *Handler) SetItem(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	encodeResponse(w, dto.SetItemResponse{
+	encodeResponse(w, contract.SetItemResponse{
 		ID:         id,
 		UpdatedRev: updatetRev,
 	}, h.logger)
@@ -245,7 +245,7 @@ func (h *Handler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	encodeResponse(w, dto.DeleteItemResponse{
+	encodeResponse(w, contract.DeleteItemResponse{
 		ID:         id,
 		UpdatedRev: updatetRev,
 	}, h.logger)
@@ -286,8 +286,8 @@ func (h *Handler) GetItem(w http.ResponseWriter, r *http.Request) {
 		updatedAt = &t
 	}
 
-	resp := dto.GetItemResponse{
-		Item: dto.ItemDTO{
+	resp := contract.GetItemResponse{
+		Item: contract.ItemDTO{
 			ID:         item.ID,
 			Type:       item.Type,
 			Ciphertext: item.Ciphertext,
@@ -324,11 +324,11 @@ func (h *Handler) GetAllItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := dto.ConvertToItemsDTO(items)
+	resp := models.ConvertToItemsDTO(items)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	encodeResponse(w, dto.GetAllItemsResponse{Items: resp}, h.logger)
+	encodeResponse(w, contract.GetAllItemsResponse{Items: resp}, h.logger)
 }
 
 func (h *Handler) GetChangesSince(w http.ResponseWriter, r *http.Request) {
@@ -366,8 +366,8 @@ func (h *Handler) GetChangesSince(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out := dto.ConvertToItemsDTO(items)
-	resp := dto.SyncItemsResponse{
+	out := models.ConvertToItemsDTO(items)
+	resp := contract.SyncItemsResponse{
 		LatestRev: rev,
 		Items:     out,
 	}

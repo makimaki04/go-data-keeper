@@ -9,6 +9,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
+	"github.com/makimaki04/go-data-keeper.git/cmd/pkg/contract"
 	"github.com/makimaki04/go-data-keeper.git/internal/models"
 	"github.com/makimaki04/go-data-keeper.git/internal/repository"
 	"go.uber.org/zap"
@@ -35,7 +36,7 @@ type AuthData struct {
 	ID        uuid.UUID
 	JWT       JWTToken
 	KDFSalt   []byte
-	KDFParams models.Params
+	KDFParams contract.Params
 }
 
 func (s *AuthService) RegisterUser(ctx context.Context, login string, password string) (AuthData, error) {
@@ -226,7 +227,7 @@ func (s *AuthService) GenerateToken(id uuid.UUID) (accessToken JWTToken, err err
 	}, nil
 }
 
-var kdf_params = models.Params{
+var kdf_params = contract.Params{
 	Algorithm:   "argon2id",
 	KeyLen:      32,
 	SaltLen:     16,
@@ -235,12 +236,12 @@ var kdf_params = models.Params{
 	Parallelism: 2,
 }
 
-func (s *AuthService) generateKDF() (kdfSalt []byte, kdfParams models.Params, err error) {
+func (s *AuthService) generateKDF() (kdfSalt []byte, kdfParams contract.Params, err error) {
 	kdfSalt = make([]byte, kdf_params.SaltLen)
 	_, err = rand.Read(kdfSalt)
 	if err != nil {
 		s.logger.Warnw("generate salt error", "op", "generate_kdf")
-		return nil, models.Params{}, err
+		return nil, contract.Params{}, err
 	}
 
 	kdfParams = kdf_params
