@@ -23,11 +23,11 @@ func NewItemService(repo repository.Items, logger *zap.SugaredLogger) *ItemServi
 	}
 }
 
-func (s *ItemService) SetItem(ctx context.Context, item models.Item) (id uuid.UUID, updatedRev int64, err error) {
+func (s *ItemService) SetItem(ctx context.Context, item models.Item) (models.Item, error) {
 	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
 
-	id, updatedRev, err = s.repo.SetItem(ctx, item)
+	out, err := s.repo.SetItem(ctx, item)
 	if err != nil {
 		s.logger.Errorw("set/update item error",
 			"op", "item.set_item",
@@ -35,7 +35,7 @@ func (s *ItemService) SetItem(ctx context.Context, item models.Item) (id uuid.UU
 			"item", item.ID,
 			"user", item.UserID,
 		)
-		return uuid.Nil, 0, err
+		return models.Item{}, err
 	}
 
 	s.logger.Infow("set item succeeded",
@@ -44,14 +44,14 @@ func (s *ItemService) SetItem(ctx context.Context, item models.Item) (id uuid.UU
 		"user", item.UserID,
 	)
 
-	return id, updatedRev, nil
+	return out, nil
 }
 
-func (s *ItemService) DeleteItem(ctx context.Context, itemID uuid.UUID, userID uuid.UUID) (id uuid.UUID, updatedRev int64, err error) {
+func (s *ItemService) DeleteItem(ctx context.Context, itemID uuid.UUID, userID uuid.UUID) (models.Item, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	id, updatedRev, err = s.repo.DeleteItem(ctx, itemID, userID)
+	out, err := s.repo.DeleteItem(ctx, itemID, userID)
 	if err != nil {
 		s.logger.Errorw("delete item error",
 			"op", "item.delete_item",
@@ -59,7 +59,7 @@ func (s *ItemService) DeleteItem(ctx context.Context, itemID uuid.UUID, userID u
 			"item", itemID,
 			"user", userID,
 		)
-		return uuid.Nil, 0, err
+		return models.Item{}, err
 	}
 
 	s.logger.Infow("delete item succeeded",
@@ -68,7 +68,7 @@ func (s *ItemService) DeleteItem(ctx context.Context, itemID uuid.UUID, userID u
 		"user", userID,
 	)
 
-	return id, updatedRev, nil
+	return out, nil
 }
 
 func (s *ItemService) GetItem(ctx context.Context, itemID uuid.UUID, userID uuid.UUID) (models.Item, error) {

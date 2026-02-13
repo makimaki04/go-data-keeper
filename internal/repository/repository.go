@@ -15,8 +15,8 @@ type Authorization interface {
 }
 
 type Items interface {
-	SetItem(ctx context.Context, item models.Item) (id uuid.UUID, updatedRev int64, err error)
-	DeleteItem(ctx context.Context, itemID uuid.UUID, userID uuid.UUID) (id uuid.UUID, updatedRev int64, err error)
+	SetItem(ctx context.Context, item models.Item) (models.Item, error)
+	DeleteItem(ctx context.Context, itemID uuid.UUID, userID uuid.UUID) (models.Item, error)
 	GetItem(ctx context.Context, itemID uuid.UUID, userID uuid.UUID) (models.Item, error)
 	GetAllItems(ctx context.Context, userID uuid.UUID) ([]models.Item, error)
 	GetChangesSince(ctx context.Context, userID uuid.UUID, since int64) ([]models.Item, int64, error)

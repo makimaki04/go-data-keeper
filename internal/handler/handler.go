@@ -188,7 +188,7 @@ func (h *Handler) SetItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	id, updatetRev, err := h.service.SetItem(ctx, item)
+	out, err := h.service.SetItem(ctx, item)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			respondWithError(w, http.StatusNotFound, repository.ErrNotFound.Error(), h.logger)
@@ -207,8 +207,7 @@ func (h *Handler) SetItem(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	encodeResponse(w, contract.SetItemResponse{
-		ID:         id,
-		UpdatedRev: updatetRev,
+		Item: models.ConvertToItemsDTO([]models.Item{out})[0],
 	}, h.logger)
 }
 
@@ -227,7 +226,7 @@ func (h *Handler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	id, updatetRev, err := h.service.DeleteItem(ctx, itemID, userID)
+	out, err := h.service.DeleteItem(ctx, itemID, userID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			respondWithError(w, http.StatusNotFound, repository.ErrNotFound.Error(), h.logger)
@@ -246,8 +245,7 @@ func (h *Handler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	encodeResponse(w, contract.DeleteItemResponse{
-		ID:         id,
-		UpdatedRev: updatetRev,
+		Item: models.ConvertToItemsDTO([]models.Item{out})[0],
 	}, h.logger)
 }
 

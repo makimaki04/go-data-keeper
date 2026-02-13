@@ -45,6 +45,13 @@ var rootCmd = &cobra.Command{
 
 		app := clientapp.NewApp(api, *store, logger)
 
+		state, err := store.LoadState()
+		if err != nil {
+			return err
+		}
+
+		api.SetToken(state.JWTToken)
+
 		cmd.SetContext(context.WithValue(cmd.Context(), appKey{}, app))
 
 		return nil
@@ -71,6 +78,8 @@ func init() {
 	// when this action is called directly.
 	rootCmd.AddCommand(registerCmd)
 	rootCmd.AddCommand(loginCmd)
+	rootCmd.AddCommand(setCmd)
+	rootCmd.AddCommand(deleteCmd)
 
 	rootCmd.PersistentFlags().StringVar(&serverURL, "server", "http://127.0.0.1:8080", "Server URL")
 	rootCmd.PersistentFlags().StringVar(&statePath, "state", "D:\\prog\\data\\gophkeeper\\state.json", "State file path")

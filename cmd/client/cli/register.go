@@ -7,8 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var regLogin string
-var regPassword string
+var regLogin, regPassword string
 
 var registerCmd = &cobra.Command{
 	Use:   "register",

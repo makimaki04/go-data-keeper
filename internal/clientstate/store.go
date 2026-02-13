@@ -52,8 +52,8 @@ func (s *Store) SaveState(data State) error {
 		return err
 	}
 
-	if err := os.WriteFile(s.stateFile.path, jsonData, 0600); err != nil {
-		s.logger.Errorw("os write file error",
+	if err := atomicWriteFile(s.stateFile.path, jsonData, 0600); err != nil {
+		s.logger.Errorw("atomic write file error",
 			"op", "state.save_state",
 			"file_path", s.stateFile.path,
 			"err", err,
@@ -103,8 +103,8 @@ func (s *Store) SaveVault(vault Vault) error {
 		return err
 	}
 
-	if err := os.WriteFile(s.vaultFile.path, jsonData, 0600); err != nil {
-		s.logger.Errorw("os write file error",
+	if err := atomicWriteFile(s.vaultFile.path, jsonData, 0600); err != nil {
+		s.logger.Errorw("atomic write file error",
 			"op", "vault.save_vault",
 			"file_path", s.vaultFile.path,
 			"err", err,
@@ -126,7 +126,7 @@ func (s *Store) LoadVault() (Vault, error) {
 				"file_path", s.vaultFile.path,
 			)
 			return Vault{
-				Vault: make(map[string]contract.ItemDTO),
+				Store: make(map[string]contract.ItemDTO),
 			}, nil
 		}
 
@@ -147,4 +147,41 @@ func (s *Store) LoadVault() (Vault, error) {
 	}
 
 	return vault, nil
+}
+
+func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(path)
+
+	tmp, err := os.CreateTemp(dir, ".tmp-*")
+	if err != nil {
+		return err
+	}
+
+	tmpName := tmp.Name()
+
+	defer func() {
+		_ = tmp.Close()
+	}()
+
+	if err := tmp.Chmod(perm); err != nil {
+		return err
+	}
+
+	if _, err := tmp.Write(data); err != nil {
+		return err
+	}
+
+	if err := tmp.Sync(); err != nil {
+		return err
+	}
+
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+
+	if err := os.Rename(tmpName, path); err != nil {
+		return err
+	}
+
+	return nil
 }

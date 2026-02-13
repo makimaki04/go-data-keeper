@@ -43,7 +43,7 @@ const (
 		deleted = false,
 		updated_rev = (SELECT current_rev FROM next_rev),
 		updated_at = now()
-		RETURNING id, updated_rev;
+		RETURNING id, user_id, type, ciphertext, nonce, aad, deleted, updated_rev, created_at, updated_at;
 	`
 	deleteItemQuery = `
 		UPDATE items
@@ -117,21 +117,33 @@ var (
 	ErrDB             = errors.New("db error")
 )
 
-func (r *ItemRepository) SetItem(ctx context.Context, item models.Item) (id uuid.UUID, updatedRev int64, err error) {
-	err = r.db.QueryRowContext(ctx, insertItemQuery,
+func (r *ItemRepository) SetItem(ctx context.Context, item models.Item) (models.Item, error) {
+	var out models.Item
+	err := r.db.QueryRowContext(ctx, insertItemQuery,
 		item.ID, item.UserID, item.Type,
 		item.Ciphertext, item.Nonce, item.AAD,
-	).Scan(&id, &updatedRev)
+	).Scan(
+		&out.ID,
+		&out.UserID,
+		&out.Type,
+		&out.Ciphertext,
+		&out.Nonce,
+		&out.AAD,
+		&out.Deleted,
+		&out.UpdatedRev,
+		&out.CreatedAt,
+		&out.UpdatedAt,
+	)
 
 	if err != nil {
 		err = checkErr(err, r.logger, "set_item")
-		return uuid.Nil, 0, err
+		return models.Item{}, err
 	}
 
-	return id, updatedRev, nil
+	return out, nil
 }
 
-func (r *ItemRepository) DeleteItem(ctx context.Context, itemID uuid.UUID, userID uuid.UUID) (id uuid.UUID, updatedRev int64, err error) {
+func (r *ItemRepository) DeleteItem(ctx context.Context, itemID uuid.UUID, userID uuid.UUID) (out models.Item, err error) {
 	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
 		r.logger.Errorw("begin delete_item transaction error",
@@ -139,7 +151,7 @@ func (r *ItemRepository) DeleteItem(ctx context.Context, itemID uuid.UUID, userI
 			"err", err,
 		)
 
-		return uuid.Nil, 0, fmt.Errorf("failed to start delete item transaction: %v", err)
+		return models.Item{}, fmt.Errorf("failed to start delete item transaction: %v", err)
 	}
 
 	defer func() {
@@ -173,26 +185,45 @@ func (r *ItemRepository) DeleteItem(ctx context.Context, itemID uuid.UUID, userI
 		dummyNonce = make([]byte, 12)
 	}
 
+	var id uuid.UUID
 	err = tx.QueryRowContext(ctx, deleteItemQuery, itemID, userID, dummyNonce).Scan(&id)
 	if err != nil {
 		err = checkErr(err, r.logger, "delete_item.delete_item_query")
-		return uuid.Nil, 0, err
+		return models.Item{}, err
 	}
 
 	var currentRev int64
 	err = tx.QueryRowContext(ctx, updateUserRevQuery, userID).Scan(&currentRev)
 	if err != nil {
 		err = checkErr(err, r.logger, "delete_item")
-		return uuid.Nil, 0, err
+		return models.Item{}, err
 	}
 
+	var updatedRev int64
 	err = tx.QueryRowContext(ctx, updateItemRevQuery, id, userID, currentRev).Scan(&updatedRev)
 	if err != nil {
 		err = checkErr(err, r.logger, "delete_item.update_item_query")
-		return uuid.Nil, 0, err
+		return models.Item{}, err
 	}
 
-	return id, updatedRev, err
+	err = tx.QueryRowContext(ctx, getItemQuery, userID, id).Scan(
+		&out.ID,
+		&out.UserID,
+		&out.Type,
+		&out.Ciphertext,
+		&out.Nonce,
+		&out.AAD,
+		&out.Deleted,
+		&out.UpdatedRev,
+		&out.CreatedAt,
+		&out.UpdatedAt,
+	)
+	if err != nil {
+		err = checkErr(err, r.logger, "delete_item.get_item_query")
+		return models.Item{}, err
+	}
+
+	return out, nil
 }
 
 func (r *ItemRepository) GetItem(ctx context.Context, itemID uuid.UUID, userID uuid.UUID) (models.Item, error) {

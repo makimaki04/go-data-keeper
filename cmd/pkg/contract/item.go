@@ -14,13 +14,11 @@ type SetItemRequest struct {
 }
 
 type SetItemResponse struct {
-	ID         uuid.UUID `json:"id"`
-	UpdatedRev int64     `json:"updated_rev"`
+	Item ItemDTO `json:"item"`
 }
 
 type DeleteItemResponse struct {
-	ID         uuid.UUID `json:"id"`
-	UpdatedRev int64     `json:"updated_rev"`
+	Item ItemDTO `json:"item"`
 }
 
 type GetItemResponse struct {

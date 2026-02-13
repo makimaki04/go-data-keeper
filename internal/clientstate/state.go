@@ -14,5 +14,5 @@ type State struct {
 }
 
 type Vault struct {
-	Vault map[string]contract.ItemDTO `json:"vault"`
+	Store map[string]contract.ItemDTO `json:"vault"`
 }
