@@ -71,6 +71,18 @@ func parseJSONBody[T any](w http.ResponseWriter, r *http.Request, MaxBytesRead i
 	return req, nil
 }
 
+// RegisterUser godoc
+// @Summary Register user
+// @Description Creates a new user and returns JWT and KDF parameters.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body contract.RegisterRequest true "Register payload"
+// @Success 200 {object} contract.RegisterResponse
+// @Failure 400 {object} map[string]string
+// @Failure 409 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/user/register [post]
 func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	req, err := parseJSONBody[contract.RegisterRequest](w, r, MaxBodyAuth, h.logger)
 	if err != nil {
@@ -108,6 +120,18 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	}, h.logger)
 }
 
+// LoginUser godoc
+// @Summary Login user
+// @Description Authenticates user and returns JWT and KDF parameters.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body contract.LoginRequest true "Login payload"
+// @Success 200 {object} contract.LoginResponse
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/user/login [post]
 func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	req, err := parseJSONBody[contract.LoginRequest](w, r, MaxBodyAuth, h.logger)
 	if err != nil {
@@ -158,6 +182,21 @@ func checkAuthData(login string, password string) (string, string, error) {
 	return login, password, nil
 }
 
+// SetItem godoc
+// @Summary Set or update item
+// @Description Creates or updates an item for the authenticated user.
+// @Tags Items
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param id path string true "Item ID"
+// @Param request body contract.SetItemRequest true "Item payload"
+// @Success 200 {object} contract.SetItemResponse
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/user/items/{id} [put]
 func (h *Handler) SetItem(w http.ResponseWriter, r *http.Request) {
 	req, err := parseJSONBody[contract.SetItemRequest](w, r, MaxBodyJSON, h.logger)
 	if err != nil {
@@ -211,6 +250,19 @@ func (h *Handler) SetItem(w http.ResponseWriter, r *http.Request) {
 	}, h.logger)
 }
 
+// DeleteItem godoc
+// @Summary Delete item
+// @Description Soft-deletes (tombstones) an item for the authenticated user.
+// @Tags Items
+// @Security BearerAuth
+// @Produce json
+// @Param id path string true "Item ID"
+// @Success 200 {object} contract.DeleteItemResponse
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/user/items/{id} [delete]
 func (h *Handler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 	itemID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -249,6 +301,19 @@ func (h *Handler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 	}, h.logger)
 }
 
+// GetItem godoc
+// @Summary Get item
+// @Description Returns a single item for the authenticated user.
+// @Tags Items
+// @Security BearerAuth
+// @Produce json
+// @Param id path string true "Item ID"
+// @Success 200 {object} contract.GetItemResponse
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/user/items/{id} [get]
 func (h *Handler) GetItem(w http.ResponseWriter, r *http.Request) {
 	itemID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -303,6 +368,16 @@ func (h *Handler) GetItem(w http.ResponseWriter, r *http.Request) {
 	encodeResponse(w, resp, h.logger)
 }
 
+// GetAllItems godoc
+// @Summary List items
+// @Description Returns all items for the authenticated user.
+// @Tags Items
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {object} contract.GetAllItemsResponse
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/user/items/ [get]
 func (h *Handler) GetAllItems(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r)
 	if !ok {
@@ -329,6 +404,18 @@ func (h *Handler) GetAllItems(w http.ResponseWriter, r *http.Request) {
 	encodeResponse(w, contract.GetAllItemsResponse{Items: resp}, h.logger)
 }
 
+// GetChangesSince godoc
+// @Summary Get changes since revision
+// @Description Returns items changed since a given revision and the latest user revision.
+// @Tags Sync
+// @Security BearerAuth
+// @Produce json
+// @Param since query int64 false "Revision to start from"
+// @Success 200 {object} contract.SyncItemsResponse
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/user/sync/changes [get]
 func (h *Handler) GetChangesSince(w http.ResponseWriter, r *http.Request) {
 	sinceStr := r.URL.Query().Get("since")
 	var since int64 = 0

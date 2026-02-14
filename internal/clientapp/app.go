@@ -25,8 +25,6 @@ type IClient interface {
 	Login(ctx context.Context, login string, password string) (contract.LoginResponse, error)
 	SetItem(ctx context.Context, itemId string, item contract.SetItemRequest) (contract.SetItemResponse, error)
 	DeleteItem(ctx context.Context, itemID string) (contract.DeleteItemResponse, error)
-	// GetItem(ctx context.Context) (contract.GetItemResponse, error)
-	// GetAllItems(ctx context.Context) (contract.GetAllItemsResponse, error)
 	// SyncChanges(ctx context.Context) (contract.SyncItemsResponse, error)
 	GetURL() string
 }
@@ -152,7 +150,7 @@ func (a *App) Login(login string, password string) error {
 	return nil
 }
 
-type Envelope struct {
+type ItemEnvelope struct {
 	V        int               `json:"v"`
 	Type     string            `json:"type"`
 	Meta     map[string]string `json:"meta,omitempty"`
@@ -226,7 +224,7 @@ func (a *App) SetItem(masterPassword string, data []byte, options SetOptions, id
 
 	aad := []byte(id.String() + ":" + itemType)
 
-	env := Envelope{
+	env := ItemEnvelope{
 		V:        1,
 		Type:     itemType,
 		Meta:     options.Meta,
@@ -398,4 +396,119 @@ func (a *App) DeleteItem(id uuid.UUID) error {
 	)
 
 	return nil
+}
+
+func (a *App) GetList(all bool, itemType string, deleted bool) ([]contract.ItemDTO, error) {
+	var items []contract.ItemDTO
+
+	vault, err := a.Store.LoadVault()
+	if err != nil {
+		return []contract.ItemDTO{}, err
+	}
+
+	if all {
+		if itemType != "" {
+			for _, item := range vault.Store {
+				if item.Type == itemType {
+					items = append(items, item)
+				}
+			}
+		} else {
+			for _, item := range vault.Store {
+				items = append(items, item)
+			}
+		}
+
+		return items, nil
+	}
+
+	if deleted {
+		if itemType != "" {
+			for _, item := range vault.Store {
+				if item.Deleted == true && item.Type == itemType {
+					items = append(items, item)
+				}
+			}
+		} else {
+			for _, item := range vault.Store {
+				if item.Deleted == true {
+					items = append(items, item)
+				}
+			}
+		}
+
+		return items, nil
+	}
+
+	if itemType != "" {
+		for _, item := range vault.Store {
+			if item.Type == itemType && item.Deleted != true {
+				items = append(items, item)
+			}
+		}
+
+		return items, nil
+	}
+
+	for _, item := range vault.Store {
+		if item.Deleted != true {
+			items = append(items, item)
+		}
+	}
+
+	return items, nil
+}
+
+func (a *App) GetItem(masterPassword string, itemID uuid.UUID) (ItemEnvelope, error) {
+	if masterPassword == "" {
+		return ItemEnvelope{}, fmt.Errorf("master password is required")
+	}
+
+	id := itemID.String()
+
+	vault, err := a.Store.LoadVault()
+	if err != nil {
+		return ItemEnvelope{}, err
+	}
+
+	item, ok := vault.Store[id]
+	if !ok {
+		return ItemEnvelope{}, fmt.Errorf("item not found: %s", id)
+	}
+
+	if item.Deleted == true {
+		return ItemEnvelope{}, fmt.Errorf("item deleted")
+	}
+
+	if len(item.Ciphertext) == 0 || len(item.Nonce) == 0 {
+		return ItemEnvelope{}, fmt.Errorf("no encrypted payload")
+	}
+
+	userState, err := a.Store.LoadState()
+	if err != nil {
+		return ItemEnvelope{}, err
+	}
+
+	key, err := clientcrypto.DeriveKey(masterPassword, userState.KDFSalt, userState.KDFParams)
+	if err != nil {
+		return ItemEnvelope{}, err
+	}
+
+	aad := []byte(item.ID.String() + ":" + item.Type)
+
+	plaintext, err := clientcrypto.Decrypt(key, item.Ciphertext, item.Nonce, aad)
+	if err != nil {
+		return ItemEnvelope{}, err
+	}
+
+	var env ItemEnvelope
+	if err := json.Unmarshal(plaintext, &env); err != nil {
+		return ItemEnvelope{}, err
+	}
+
+	if env.Type != item.Type {
+		return ItemEnvelope{}, fmt.Errorf("data integrity error: envelope type mismatch")
+	}
+
+	return env, nil
 }

@@ -1,9 +1,16 @@
 # Binaries
 *.exe
 *.exe~
+*.exe.stackdump
 *.dll
 *.so
 *.dylib
+*.a
+*.o
+*.obj
+*.lib
+*.pdb
+*.ilk
 
 # Test binaries
 *.test
@@ -17,6 +24,7 @@ coverage.*
 logs/
 *.log
 tmp/
+*.bin
 
 # Go build cache
 bin/

@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
+	_ "github.com/makimaki04/go-data-keeper.git/docs"
 	"github.com/makimaki04/go-data-keeper.git/internal/config"
 	"github.com/makimaki04/go-data-keeper.git/internal/database"
 	"github.com/makimaki04/go-data-keeper.git/internal/handler"
@@ -18,6 +19,7 @@ import (
 	"github.com/makimaki04/go-data-keeper.git/internal/middleware"
 	"github.com/makimaki04/go-data-keeper.git/internal/repository"
 	"github.com/makimaki04/go-data-keeper.git/internal/service"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 	"go.uber.org/zap"
 )
 
@@ -63,6 +65,9 @@ func main() {
 					r.Get("/changes", handler.GetChangesSince)
 				})
 			})
+		})
+		r.Route("/swagger", func(r chi.Router) {
+			r.Get("/*", httpSwagger.WrapHandler)
 		})
 	})
 

@@ -46,7 +46,7 @@ func NewStore(statePath string, vaultPath string, logger *zap.SugaredLogger) (*S
 }
 
 func (s *Store) SaveState(data State) error {
-	jsonData, err := json.Marshal(data)
+	jsonData, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		s.logger.Errorw("data json.marshal error", "op", "state.save_state")
 		return err
@@ -97,7 +97,7 @@ func (s *Store) LoadState() (State, error) {
 }
 
 func (s *Store) SaveVault(vault Vault) error {
-	jsonData, err := json.Marshal(vault)
+	jsonData, err := json.MarshalIndent(vault, "", "  ")
 	if err != nil {
 		s.logger.Errorw("data json.marshal error", "op", "vault.save_vault")
 		return err

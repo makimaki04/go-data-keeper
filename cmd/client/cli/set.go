@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var masterPassword, itemType, file, userData, metaText, itemId string
+var masterPassword, setItemType, file, userData, metaText, itemId string
 var metaPairs []string
 
 var types = []string{"login/pass", "text", "binary", "card"}
@@ -20,11 +20,11 @@ var setCmd = &cobra.Command{
 	Use:   "set",
 	Short: "command for set new item or update existing item using item_id",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if !slices.Contains(types, itemType) {
-			return fmt.Errorf("unsupported user data type %v", types)
+		if !slices.Contains(types, setItemType) {
+			return fmt.Errorf("unsupported type, allowed: %v", types)
 		}
 
-		data, err := GetData(file, userData, itemType)
+		data, err := GetData(file, userData, setItemType)
 		if err != nil {
 			return err
 		}
@@ -46,13 +46,13 @@ var setCmd = &cobra.Command{
 
 		app := cmd.Context().Value(appKey{}).(*clientapp.App)
 
-		return app.SetItem(masterPassword, data, setOptions, id, itemType)
+		return app.SetItem(masterPassword, data, setOptions, id, setItemType)
 	},
 }
 
 func init() {
 	setCmd.Flags().StringVar(&masterPassword, "password", "", "Master password")
-	setCmd.Flags().StringVar(&itemType, "type", "", "user data type: login/pass, text, binary, card")
+	setCmd.Flags().StringVar(&setItemType, "type", "", "user data type: login/pass, text, binary, card")
 	setCmd.Flags().StringVar(&file, "file", "", "binary data file path")
 	setCmd.Flags().StringVar(&itemId, "id", "", "item id for update")
 	setCmd.Flags().StringVar(&userData, "data", "", "user data")

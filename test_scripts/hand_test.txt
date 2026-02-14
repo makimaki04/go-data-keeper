@@ -1,0 +1,115 @@
+Manual CLI test notes (PowerShell)
+
+Goal: run a full happy-path + negative-path manual test for register/login/set/get/list/update/delete.
+Tip: the fastest workflow is to run `test_scripts\cli_mock_test.ps1` once, then continue manually using the generated `client.exe`.
+
+---
+Prerequisites
+
+1) Start the server (separate terminal, repo root):
+   go run .\cmd\server
+
+2) Use a dedicated test state/vault to avoid polluting real data:
+   .\tmp\cli-mock-test\state.json
+   .\tmp\cli-mock-test\vault.json
+
+---
+Option A (recommended): prepare data via script
+
+powershell -NoProfile -ExecutionPolicy Bypass -File .\test_scripts\cli_mock_test.ps1
+
+This also builds a reusable client binary here:
+  .\tmp\cli-mock-test\client.exe
+
+---
+Option B: manual from scratch (no script)
+
+# Variables (repo root)
+$CLIENT = ".\tmp\cli-mock-test\client.exe"   # built by the script, or build it manually (see below)
+$SERVER = "http://127.0.0.1:8080"
+$STATE  = ".\tmp\cli-mock-test\state.json"
+$VAULT  = ".\tmp\cli-mock-test\vault.json"
+$MASTER = "mock_master_password_123!"       # must match the password you use for set/get
+
+# If client.exe does not exist (or code changed), build it:
+go build -o $CLIENT .\cmd\client
+
+---
+Register + Login (JWT is stored in state.json)
+
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT register --login "mock_user" --password "mock_user_password_123!"
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT login    --login "mock_user" --password "mock_user_password_123!"
+
+Note: `register` may fail with 409 Conflict if the user already exists. That is OK for repeated manual tests.
+
+---
+IDs used in examples (stable)
+
+$ID_LOGIN = "a4f9c4d0-2f49-4a7e-8f35-6cc8f0a77c6b"
+$ID_TEXT  = "7bafad08-1ac0-4b2f-a1a6-9bcbd6b82b7f"
+$ID_CARD  = "e13dce30-7b26-4d03-a5c4-204b6f3e25d4"
+$ID_BIN   = "d7b2c9b1-3f5f-4f30-9a5a-1c2c2d2d2d2d"
+
+---
+SET (create 4 types, with all flags)
+
+# login/pass
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT set --password $MASTER --type "login/pass" --id $ID_LOGIN --data '{"login":"alice","password":"p@ssw0rd","url":"https://example.com"}' --meta env=dev --meta app=gdk --meta-text "login/pass demo"
+
+# text
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT set --password $MASTER --type "text" --id $ID_TEXT --data "hello text #1" --meta env=dev --meta kind=text --meta-text "text demo"
+
+# card
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT set --password $MASTER --type "card" --id $ID_CARD --data '{"name":"ALICE","pan":"4111111111111111","exp":"12/30","cvc":"123"}' --meta env=dev --meta kind=card --meta-text "card demo"
+
+# binary (create input file, then set)
+[System.IO.File]::WriteAllBytes(".\tmp\cli-mock-test\in.bin", [byte[]](0..255))
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT set --password $MASTER --type "binary" --id $ID_BIN --file ".\tmp\cli-mock-test\in.bin" --meta env=dev --meta kind=binary --meta-text "binary demo"
+
+---
+LIST (all flags / combinations)
+
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT list
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT list --type "text"
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT list --deleted
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT list --all
+
+# Note: current implementation: --all takes precedence over --deleted
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT list --all --deleted
+
+---
+GET (all flags, including binary)
+
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT get --password $MASTER --id $ID_TEXT
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT get --password $MASTER --id $ID_LOGIN
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT get --password $MASTER --id $ID_CARD
+
+# binary requires --out
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT get --password $MASTER --id $ID_BIN --out ".\tmp\cli-mock-test\out.bin"
+
+---
+UPDATE (use set with the same ID)
+
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT set --password $MASTER --type "text" --id $ID_TEXT --data "hello text #2 (updated)" --meta env=dev --meta kind=text --meta updated=true --meta-text "text demo updated"
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT get --password $MASTER --id $ID_TEXT
+
+---
+DELETE
+
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT delete --id $ID_CARD
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT list --deleted
+
+---
+Negative checks (expected failures)
+
+# 1) binary get without --out must fail
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT get --password $MASTER --id $ID_BIN
+
+# 2) deleted item get must fail
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT get --password $MASTER --id $ID_CARD
+
+# 3) list with unsupported type must fail
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT list --type "nope"
+
+# 4) wrong master password must fail decrypt
+& $CLIENT --server $SERVER --state $STATE --vault $VAULT get --password "WRONG_PASSWORD" --id $ID_TEXT

@@ -80,6 +80,8 @@ func init() {
 	rootCmd.AddCommand(loginCmd)
 	rootCmd.AddCommand(setCmd)
 	rootCmd.AddCommand(deleteCmd)
+	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(getCmd)
 
 	rootCmd.PersistentFlags().StringVar(&serverURL, "server", "http://127.0.0.1:8080", "Server URL")
 	rootCmd.PersistentFlags().StringVar(&statePath, "state", "D:\\prog\\data\\gophkeeper\\state.json", "State file path")

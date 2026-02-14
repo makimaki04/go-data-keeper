@@ -1,0 +1,425 @@
+definitions:
+  contract.DeleteItemResponse:
+    properties:
+      item:
+        $ref: '#/definitions/contract.ItemDTO'
+    type: object
+  contract.GetAllItemsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/contract.ItemDTO'
+        type: array
+    type: object
+  contract.GetItemResponse:
+    properties:
+      item:
+        $ref: '#/definitions/contract.ItemDTO'
+    type: object
+  contract.ItemDTO:
+    properties:
+      aad:
+        items:
+          type: integer
+        type: array
+      ciphertext:
+        items:
+          type: integer
+        type: array
+      created_at:
+        type: string
+      deleted:
+        type: boolean
+      id:
+        type: string
+      nonce:
+        items:
+          type: integer
+        type: array
+      type:
+        type: string
+      updated_at:
+        type: string
+      updated_rev:
+        type: integer
+    type: object
+  contract.LoginRequest:
+    properties:
+      login:
+        type: string
+      password:
+        type: string
+    type: object
+  contract.LoginResponse:
+    properties:
+      expires_at:
+        type: string
+      jwt_token:
+        type: string
+      kdf_params:
+        $ref: '#/definitions/contract.Params'
+      kdf_salt:
+        items:
+          type: integer
+        type: array
+    type: object
+  contract.Params:
+    properties:
+      algorithm:
+        type: string
+      key_len:
+        type: integer
+      memory:
+        type: integer
+      parallelism:
+        type: integer
+      salt_len:
+        type: integer
+      time:
+        type: integer
+    type: object
+  contract.RegisterRequest:
+    properties:
+      login:
+        type: string
+      password:
+        type: string
+    type: object
+  contract.RegisterResponse:
+    properties:
+      expires_at:
+        type: string
+      id:
+        type: string
+      jwt_token:
+        type: string
+      kdf_params:
+        $ref: '#/definitions/contract.Params'
+      kdf_salt:
+        items:
+          type: integer
+        type: array
+    type: object
+  contract.SetItemRequest:
+    properties:
+      aad:
+        items:
+          type: integer
+        type: array
+      ciphertext:
+        items:
+          type: integer
+        type: array
+      nonce:
+        items:
+          type: integer
+        type: array
+      type:
+        type: string
+    type: object
+  contract.SetItemResponse:
+    properties:
+      item:
+        $ref: '#/definitions/contract.ItemDTO'
+    type: object
+  contract.SyncItemsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/contract.ItemDTO'
+        type: array
+      latest_rev:
+        type: integer
+    type: object
+info:
+  contact: {}
+paths:
+  /api/user/items/:
+    get:
+      description: Returns all items for the authenticated user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/contract.GetAllItemsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List items
+      tags:
+      - Items
+  /api/user/items/{id}:
+    delete:
+      description: Soft-deletes (tombstones) an item for the authenticated user.
+      parameters:
+      - description: Item ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/contract.DeleteItemResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete item
+      tags:
+      - Items
+    get:
+      description: Returns a single item for the authenticated user.
+      parameters:
+      - description: Item ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/contract.GetItemResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get item
+      tags:
+      - Items
+    put:
+      consumes:
+      - application/json
+      description: Creates or updates an item for the authenticated user.
+      parameters:
+      - description: Item ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Item payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/contract.SetItemRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/contract.SetItemResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Set or update item
+      tags:
+      - Items
+  /api/user/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates user and returns JWT and KDF parameters.
+      parameters:
+      - description: Login payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/contract.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/contract.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Login user
+      tags:
+      - Auth
+  /api/user/register:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user and returns JWT and KDF parameters.
+      parameters:
+      - description: Register payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/contract.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/contract.RegisterResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Register user
+      tags:
+      - Auth
+  /api/user/sync/changes:
+    get:
+      description: Returns items changed since a given revision and the latest user
+        revision.
+      parameters:
+      - description: Revision to start from
+        format: int64
+        in: query
+        name: since
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/contract.SyncItemsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get changes since revision
+      tags:
+      - Sync
+swagger: "2.0"
