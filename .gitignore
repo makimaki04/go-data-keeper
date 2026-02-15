@@ -42,7 +42,6 @@ vendor/
 
 # Env
 .env
-.env.*
 
 # OS
 .DS_Store

@@ -14,6 +14,4 @@ var syncCmd = &cobra.Command{
 	},
 }
 
-func init() {
-
-}
+func init() {}
