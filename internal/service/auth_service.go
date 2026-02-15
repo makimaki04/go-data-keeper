@@ -16,12 +16,14 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// AuthService implements authentication workflows and token generation.
 type AuthService struct {
 	repo      repository.Authorization
 	jwtSecret string
 	logger    *zap.SugaredLogger
 }
 
+// NewAuthService creates an AuthService using the provided repository and JWT secret.
 func NewAuthService(repo repository.Authorization, secret string, logger *zap.SugaredLogger) *AuthService {
 	logger = logger.With("component", "auth", "layer", "service")
 
@@ -32,6 +34,7 @@ func NewAuthService(repo repository.Authorization, secret string, logger *zap.Su
 	}
 }
 
+// AuthData is authentication result data returned by AuthService.
 type AuthData struct {
 	ID        uuid.UUID
 	JWT       JWTToken
@@ -39,6 +42,9 @@ type AuthData struct {
 	KDFParams contract.Params
 }
 
+// RegisterUser registers a new user and returns authentication data.
+// The context controls cancellation and deadlines.
+// RegisterUser returns an error if persistence, password hashing, or token generation fails.
 func (s *AuthService) RegisterUser(ctx context.Context, login string, password string) (AuthData, error) {
 	passHash, err := generatePasswordHash(password)
 	if err != nil {
@@ -127,8 +133,12 @@ func generatePasswordHash(password string) (string, error) {
 	return string(hash), nil
 }
 
+// ErrInvalidCredentials is returned when login or password validation fails.
 var ErrInvalidCredentials = errors.New("invalid login or password")
 
+// LoginUser authenticates a user and returns authentication data.
+// The context controls cancellation and deadlines.
+// LoginUser returns ErrInvalidCredentials if the password does not match.
 func (s *AuthService) LoginUser(ctx context.Context, login string, password string) (AuthData, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 	defer cancel()
@@ -190,16 +200,20 @@ func (s *AuthService) LoginUser(ctx context.Context, login string, password stri
 	return data, nil
 }
 
+// JWTToken holds an access token and its expiration time.
 type JWTToken struct {
 	AccessToken string
 	ExpiresAt   time.Time
 }
 
+// Claims describes JWT claims used by the server.
 type Claims struct {
 	UserID uuid.UUID `json:"id"`
 	jwt.RegisteredClaims
 }
 
+// GenerateToken generates a new JWT access token for the provided user ID.
+// GenerateToken returns an error if signing fails.
 func (s *AuthService) GenerateToken(id uuid.UUID) (accessToken JWTToken, err error) {
 	expTime := time.Now().Add(15 * time.Minute)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{

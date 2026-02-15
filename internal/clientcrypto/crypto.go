@@ -1,3 +1,4 @@
+// Package clientcrypto provides cryptographic helpers for client-side encryption.
 package clientcrypto
 
 import (
@@ -10,6 +11,8 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
+// DeriveKey derives a symmetric key from a password and KDF parameters.
+// DeriveKey returns an error if the provided parameters are invalid.
 func DeriveKey(password string, kdfSalt []byte, kdfParams contract.Params) ([]byte, error) {
 	if len(kdfSalt) != 16 {
 		return nil, fmt.Errorf("wrong derive key params")
@@ -30,6 +33,8 @@ func DeriveKey(password string, kdfSalt []byte, kdfParams contract.Params) ([]by
 	return key, nil
 }
 
+// Encrypt encrypts plaintext using key and returns the ciphertext and nonce.
+// Encrypt returns an error if the key is invalid or encryption can't be performed.
 func Encrypt(key []byte, plaintext []byte, aad []byte) (ciphertext []byte, nonce []byte, err error) {
 	if len(key) != 32 {
 		return nil, nil, fmt.Errorf("wrong encrypt params: invalid key len %d", len(key))
@@ -55,6 +60,8 @@ func Encrypt(key []byte, plaintext []byte, aad []byte) (ciphertext []byte, nonce
 	return ciphertext, nonce, nil
 }
 
+// Decrypt decrypts ciphertext using key and nonce and returns the plaintext.
+// Decrypt returns an error if inputs are invalid or authentication fails.
 func Decrypt(key []byte, ciphertext []byte, nonce []byte, aad []byte) (plaintext []byte, err error) {
 	if len(key) != 32 {
 		return nil, fmt.Errorf("wrong decrypt params: invalid key len %d", len(key))

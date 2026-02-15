@@ -8,6 +8,8 @@ import (
 	"go.uber.org/zap"
 )
 
+// WithLogging logs request and response information using the provided logger.
+// WithLogging returns a no-op middleware if logger is nil.
 func WithLogging(logger *zap.SugaredLogger) func(next http.Handler) http.Handler {
 	if logger == nil {
 		return func(next http.Handler) http.Handler {

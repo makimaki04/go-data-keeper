@@ -1,3 +1,4 @@
+// Package clientapp provides the client application layer and high-level workflows.
 package clientapp
 
 import (
@@ -13,13 +14,17 @@ import (
 	"go.uber.org/zap"
 )
 
+// App orchestrates client workflows using an API client and local storage.
 type App struct {
+	// Client is the API client used to talk to the server.
 	Client IClient
+	// Store is the local persistence layer for client state and vault data.
 	Store  clientstate.Store
 	ctx    context.Context
 	logger *zap.SugaredLogger
 }
 
+// IClient describes the server API used by App.
 type IClient interface {
 	Register(ctx context.Context, login string, password string) (contract.RegisterResponse, error)
 	Login(ctx context.Context, login string, password string) (contract.LoginResponse, error)
@@ -29,6 +34,7 @@ type IClient interface {
 	GetURL() string
 }
 
+// NewApp creates an App using the provided API client and local store.
 func NewApp(client IClient, store clientstate.Store, logger *zap.SugaredLogger) *App {
 	logger = logger.With("component", "app")
 
@@ -40,6 +46,8 @@ func NewApp(client IClient, store clientstate.Store, logger *zap.SugaredLogger) 
 	}
 }
 
+// Register registers a new user, persists the resulting auth state, and performs an initial sync.
+// Register returns an error if the server request fails or local persistence fails.
 func (a *App) Register(login string, password string) error {
 	ctx, cancel := context.WithTimeout(a.ctx, 7*time.Second)
 	defer cancel()
@@ -147,6 +155,8 @@ func (a *App) Register(login string, password string) error {
 	return nil
 }
 
+// Login authenticates a user, persists the resulting auth state, and performs a sync.
+// Login returns an error if the server request fails or local persistence fails.
 func (a *App) Login(login string, password string) error {
 	ctx, cancel := context.WithTimeout(a.ctx, 7*time.Second)
 	defer cancel()
@@ -246,6 +256,7 @@ func (a *App) Login(login string, password string) error {
 	return nil
 }
 
+// ItemEnvelope is a plaintext payload that is encrypted and stored as an item.
 type ItemEnvelope struct {
 	V        int               `json:"v"`
 	Type     string            `json:"type"`
@@ -254,11 +265,14 @@ type ItemEnvelope struct {
 	Data     []byte            `json:"data,omitempty"`
 }
 
+// SetOptions configures metadata stored in the item envelope.
 type SetOptions struct {
 	Meta     map[string]string
 	MetaText string
 }
 
+// SetItem encrypts data and stores it on the server, then updates the local vault.
+// SetItem returns an error if encryption, the server request, or local persistence fails.
 func (a *App) SetItem(masterPassword string, data []byte, options SetOptions, id uuid.UUID, itemType string) error {
 	ctx, cancel := context.WithTimeout(a.ctx, 12*time.Second)
 	defer cancel()
@@ -422,6 +436,8 @@ func (a *App) SetItem(masterPassword string, data []byte, options SetOptions, id
 	return nil
 }
 
+// DeleteItem deletes an item on the server and records the tombstone in the local vault.
+// DeleteItem returns an error if the server request or local persistence fails.
 func (a *App) DeleteItem(id uuid.UUID) error {
 	ctx, cancel := context.WithTimeout(a.ctx, 10*time.Second)
 	defer cancel()
@@ -494,6 +510,8 @@ func (a *App) DeleteItem(id uuid.UUID) error {
 	return nil
 }
 
+// GetList returns items from the local vault filtered by the provided flags.
+// GetList returns an error if the vault can't be loaded.
 func (a *App) GetList(all bool, itemType string, deleted bool) ([]contract.ItemDTO, error) {
 	var items []contract.ItemDTO
 
@@ -597,6 +615,8 @@ func (a *App) GetList(all bool, itemType string, deleted bool) ([]contract.ItemD
 	return items, nil
 }
 
+// GetItem decrypts an item from the local vault and returns its envelope.
+// GetItem returns an error if the item is missing or deleted, decryption fails, or local state can't be loaded.
 func (a *App) GetItem(masterPassword string, itemID uuid.UUID) (ItemEnvelope, error) {
 	if masterPassword == "" {
 		err := fmt.Errorf("master password is required")
@@ -727,6 +747,8 @@ func (a *App) GetItem(masterPassword string, itemID uuid.UUID) (ItemEnvelope, er
 	return env, nil
 }
 
+// SyncChanges fetches changes from the server since the last sync and applies them to the local vault.
+// SyncChanges returns an error if the server request fails or local persistence fails.
 func (a *App) SyncChanges() error {
 	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
 	defer cancel()

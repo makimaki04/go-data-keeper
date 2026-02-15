@@ -1,3 +1,4 @@
+// Package migrations provides embedded database migration execution.
 package migrations
 
 import (
@@ -14,6 +15,8 @@ import (
 //go:embed migration_files/*.sql
 var migrationsDir embed.FS
 
+// RunMigration applies embedded SQL migrations to the database referenced by dsn.
+// RunMigration returns an error if migrations can't be initialized or applied.
 func RunMigration(dsn string, logger *zap.SugaredLogger) error {
 	d, err := iofs.New(migrationsDir, "migration_files")
 	if err != nil {

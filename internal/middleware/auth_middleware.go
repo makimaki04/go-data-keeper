@@ -1,3 +1,4 @@
+// Package middleware provides HTTP middlewares for authentication and logging.
 package middleware
 
 import (
@@ -12,6 +13,8 @@ import (
 	"go.uber.org/zap"
 )
 
+// WithAuth validates Bearer tokens and injects the user ID into the request context.
+// WithAuth rejects unauthorized requests with HTTP 401.
 func WithAuth(secret string, logger *zap.SugaredLogger) func(next http.Handler) http.Handler {
 	logger = logger.With("component", "auth_middleware")
 
@@ -97,6 +100,7 @@ type contextKey string
 
 const userIDKey contextKey = "userID"
 
+// GetUserID extracts the authenticated user ID from the request context.
 func GetUserID(r *http.Request) (uuid.UUID, bool) {
 	id, ok := r.Context().Value(userIDKey).(uuid.UUID)
 	return id, ok

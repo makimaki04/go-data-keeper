@@ -9,16 +9,20 @@ import (
 	"go.uber.org/zap"
 )
 
+// FileStore identifies a file used for persistent storage.
 type FileStore struct {
 	path string
 }
 
+// Store persists client state and vault data on disk.
 type Store struct {
 	stateFile FileStore
 	vaultFile FileStore
 	logger    *zap.SugaredLogger
 }
 
+// NewStore creates a Store and ensures that its parent directories exist.
+// NewStore returns an error if the store directories can't be created.
 func NewStore(statePath string, vaultPath string, logger *zap.SugaredLogger) (*Store, error) {
 	logger = logger.With("component", "store")
 
@@ -45,6 +49,8 @@ func NewStore(statePath string, vaultPath string, logger *zap.SugaredLogger) (*S
 	}, nil
 }
 
+// SaveState writes the provided state to disk.
+// SaveState returns an error if the state can't be encoded or written.
 func (s *Store) SaveState(data State) error {
 	jsonData, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
@@ -64,6 +70,9 @@ func (s *Store) SaveState(data State) error {
 	return nil
 }
 
+// LoadState loads the state from disk.
+// LoadState returns an empty State if the state file does not exist.
+// LoadState returns an error if the file can't be read or decoded.
 func (s *Store) LoadState() (State, error) {
 	var state State
 
@@ -96,6 +105,8 @@ func (s *Store) LoadState() (State, error) {
 	return state, nil
 }
 
+// SaveVault writes the provided vault to disk.
+// SaveVault returns an error if the vault can't be encoded or written.
 func (s *Store) SaveVault(vault Vault) error {
 	jsonData, err := json.MarshalIndent(vault, "", "  ")
 	if err != nil {
@@ -115,6 +126,9 @@ func (s *Store) SaveVault(vault Vault) error {
 	return nil
 }
 
+// LoadVault loads the vault from disk.
+// LoadVault returns an empty vault if the vault file does not exist.
+// LoadVault returns an error if the file can't be read or decoded.
 func (s *Store) LoadVault() (Vault, error) {
 	var vault Vault
 
@@ -190,6 +204,8 @@ func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 	return nil
 }
 
+// WipeVault clears the vault on disk.
+// WipeVault returns an error if the vault can't be encoded or written.
 func (s *Store) WipeVault() error {
 	var vault Vault
 	vault.Store = make(map[string]contract.ItemDTO)

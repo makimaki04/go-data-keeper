@@ -101,6 +101,8 @@ func parseMeta(pairs []string) (map[string]string, error) {
 	return out, nil
 }
 
+// Uuid parses itemID as a UUID or returns a new UUID if itemID is empty.
+// Uuid returns an error if itemID is not a valid UUID.
 func Uuid(itemID string) (uuid.UUID, error) {
 	if itemID != "" {
 		id, err := uuid.Parse(itemID)
@@ -114,6 +116,8 @@ func Uuid(itemID string) (uuid.UUID, error) {
 	return uuid.New(), nil
 }
 
+// GetData returns the item payload for the given type from either file or userData.
+// GetData returns an error if inputs are inconsistent or required data is missing.
 func GetData(file string, userData string, itemType string) ([]byte, error) {
 	if file != "" && userData != "" {
 		return nil, fmt.Errorf("use either --file or --data, not both")

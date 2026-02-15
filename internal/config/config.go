@@ -1,3 +1,4 @@
+// Package config loads and validates application configuration.
 package config
 
 import (
@@ -10,12 +11,15 @@ import (
 	"go.uber.org/zap"
 )
 
+// Config holds server configuration values.
 type Config struct {
 	Address     string `env:"RUN_ADDRESS"`
 	DatabaseURI string `env:"DATABASE_URI"`
 	JWTSecret   string `env:"JWT_SECRET"`
 }
 
+// InitConfig loads configuration from environment variables and flags.
+// InitConfig returns an error if required values are missing or invalid.
 func InitConfig(logger *zap.SugaredLogger) (Config, error) {
 	var cfg Config
 

@@ -26,11 +26,13 @@ const (
 	`
 )
 
+// AuthRepository implements user persistence backed by a SQL database.
 type AuthRepository struct {
 	db     *sql.DB
 	logger *zap.SugaredLogger
 }
 
+// NewAuthRepository creates an AuthRepository backed by db.
 func NewAuthRepository(db *sql.DB, logger *zap.SugaredLogger) *AuthRepository {
 	logger = logger.With("component", "auth", "layer", "repo")
 
@@ -41,10 +43,15 @@ func NewAuthRepository(db *sql.DB, logger *zap.SugaredLogger) *AuthRepository {
 }
 
 var (
+	// ErrUserExists is returned when a user with the same login already exists.
 	ErrUserExists   = errors.New("user already exists")
+	// ErrUserNotFound is returned when a user can't be found by login.
 	ErrUserNotFound = errors.New("user not found")
 )
 
+// RegisterUser creates a new user record and returns its ID.
+// The context controls cancellation and deadlines.
+// RegisterUser returns ErrUserExists if a user with the same login already exists.
 func (r *AuthRepository) RegisterUser(ctx context.Context, user models.User) (uuid.UUID, error) {
 	var id uuid.UUID
 
@@ -112,6 +119,9 @@ func (r *AuthRepository) RegisterUser(ctx context.Context, user models.User) (uu
 	return id, nil
 }
 
+// LoginUser loads a user record by login.
+// The context controls cancellation and deadlines.
+// LoginUser returns ErrUserNotFound if the user does not exist.
 func (r *AuthRepository) LoginUser(ctx context.Context, login string) (models.User, error) {
 	var user models.User
 

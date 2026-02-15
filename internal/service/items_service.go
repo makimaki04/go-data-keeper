@@ -10,11 +10,13 @@ import (
 	"go.uber.org/zap"
 )
 
+// ItemService implements item-related business operations.
 type ItemService struct {
 	repo   repository.Items
 	logger *zap.SugaredLogger
 }
 
+// NewItemService creates an ItemService using the provided repository.
 func NewItemService(repo repository.Items, logger *zap.SugaredLogger) *ItemService {
 	logger = logger.With("component", "items", "layer", "service")
 	return &ItemService{
@@ -23,6 +25,8 @@ func NewItemService(repo repository.Items, logger *zap.SugaredLogger) *ItemServi
 	}
 }
 
+// SetItem stores an item and returns the stored record.
+// The context controls cancellation and deadlines.
 func (s *ItemService) SetItem(ctx context.Context, item models.Item) (models.Item, error) {
 	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
@@ -47,6 +51,8 @@ func (s *ItemService) SetItem(ctx context.Context, item models.Item) (models.Ite
 	return out, nil
 }
 
+// DeleteItem deletes an item and returns the resulting record.
+// The context controls cancellation and deadlines.
 func (s *ItemService) DeleteItem(ctx context.Context, itemID uuid.UUID, userID uuid.UUID) (models.Item, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -71,6 +77,8 @@ func (s *ItemService) DeleteItem(ctx context.Context, itemID uuid.UUID, userID u
 	return out, nil
 }
 
+// GetItem loads a single item for the given user.
+// The context controls cancellation and deadlines.
 func (s *ItemService) GetItem(ctx context.Context, itemID uuid.UUID, userID uuid.UUID) (models.Item, error) {
 	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
@@ -95,6 +103,8 @@ func (s *ItemService) GetItem(ctx context.Context, itemID uuid.UUID, userID uuid
 	return item, nil
 }
 
+// GetAllItems returns all items for the given user.
+// The context controls cancellation and deadlines.
 func (s *ItemService) GetAllItems(ctx context.Context, userID uuid.UUID) ([]models.Item, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -118,6 +128,8 @@ func (s *ItemService) GetAllItems(ctx context.Context, userID uuid.UUID) ([]mode
 	return items, nil
 }
 
+// GetChangesSince returns items changed since a revision and the latest user revision.
+// The context controls cancellation and deadlines.
 func (s *ItemService) GetChangesSince(ctx context.Context, userID uuid.UUID, since int64) ([]models.Item, int64, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()

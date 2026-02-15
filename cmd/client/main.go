@@ -1,6 +1,7 @@
 /*
 Copyright © 2026 NAME HERE <EMAIL ADDRESS>
 */
+// Package main provides the client CLI entry point.
 package main
 
 import (

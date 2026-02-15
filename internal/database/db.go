@@ -1,3 +1,4 @@
+// Package database initializes database connections and migrations.
 package database
 
 import (
@@ -11,6 +12,8 @@ import (
 	"go.uber.org/zap"
 )
 
+// InitDB runs migrations, opens a database connection, and verifies connectivity.
+// InitDB returns an error if migrations fail, the connection can't be opened, or the database can't be reached.
 func InitDB(dsn string, logger *zap.SugaredLogger) (*sql.DB, error) {
 	logger = logger.With("component", "database", "op", "db.init_db")
 

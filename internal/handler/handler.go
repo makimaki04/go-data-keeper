@@ -1,3 +1,4 @@
+// Package handler provides HTTP handlers for the server API.
 package handler
 
 import (
@@ -20,11 +21,13 @@ import (
 	"go.uber.org/zap"
 )
 
+// Handler groups HTTP handlers for the server API.
 type Handler struct {
 	service *service.Service
 	logger  *zap.SugaredLogger
 }
 
+// NewHandler creates a Handler using the provided service layer.
 func NewHandler(service *service.Service, logger *zap.SugaredLogger) *Handler {
 	logger = logger.With("component", "handler")
 
@@ -37,7 +40,9 @@ func NewHandler(service *service.Service, logger *zap.SugaredLogger) *Handler {
 const (
 	MB = 1 << 20
 
+	// MaxBodyAuth is the maximum request body size for auth requests.
 	MaxBodyAuth = 1 * MB
+	// MaxBodyJSON is the maximum request body size for JSON item requests.
 	MaxBodyJSON = 3 * MB
 )
 
@@ -71,7 +76,7 @@ func parseJSONBody[T any](w http.ResponseWriter, r *http.Request, MaxBytesRead i
 	return req, nil
 }
 
-// RegisterUser godoc
+// RegisterUser handles POST /api/user/register requests.
 // @Summary Register user
 // @Description Creates a new user and returns JWT and KDF parameters.
 // @Tags Auth
@@ -120,7 +125,7 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	}, h.logger)
 }
 
-// LoginUser godoc
+// LoginUser handles POST /api/user/login requests.
 // @Summary Login user
 // @Description Authenticates user and returns JWT and KDF parameters.
 // @Tags Auth
@@ -184,7 +189,7 @@ func checkAuthData(login string, password string) (string, string, error) {
 	return login, password, nil
 }
 
-// SetItem godoc
+// SetItem handles PUT /api/user/items/{id} requests.
 // @Summary Set or update item
 // @Description Creates or updates an item for the authenticated user.
 // @Tags Items
@@ -252,7 +257,7 @@ func (h *Handler) SetItem(w http.ResponseWriter, r *http.Request) {
 	}, h.logger)
 }
 
-// DeleteItem godoc
+// DeleteItem handles DELETE /api/user/items/{id} requests.
 // @Summary Delete item
 // @Description Soft-deletes (tombstones) an item for the authenticated user.
 // @Tags Items
@@ -303,7 +308,7 @@ func (h *Handler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 	}, h.logger)
 }
 
-// GetItem godoc
+// GetItem handles GET /api/user/items/{id} requests.
 // @Summary Get item
 // @Description Returns a single item for the authenticated user.
 // @Tags Items
@@ -370,7 +375,7 @@ func (h *Handler) GetItem(w http.ResponseWriter, r *http.Request) {
 	encodeResponse(w, resp, h.logger)
 }
 
-// GetAllItems godoc
+// GetAllItems handles GET /api/user/items/ requests.
 // @Summary List items
 // @Description Returns all items for the authenticated user.
 // @Tags Items
@@ -406,7 +411,7 @@ func (h *Handler) GetAllItems(w http.ResponseWriter, r *http.Request) {
 	encodeResponse(w, contract.GetAllItemsResponse{Items: resp}, h.logger)
 }
 
-// GetChangesSince godoc
+// GetChangesSince handles GET /api/user/sync/changes requests.
 // @Summary Get changes since revision
 // @Description Returns items changed since a given revision and the latest user revision.
 // @Tags Sync

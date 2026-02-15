@@ -94,11 +94,13 @@ const (
 	`
 )
 
+// ItemRepository implements item persistence backed by a SQL database.
 type ItemRepository struct {
 	db     *sql.DB
 	logger *zap.SugaredLogger
 }
 
+// NewItemRepository creates an ItemRepository backed by db.
 func NewItemRepository(db *sql.DB, logger *zap.SugaredLogger) *ItemRepository {
 	logger = logger.With("component", "items", "layer", "repo")
 
@@ -109,14 +111,22 @@ func NewItemRepository(db *sql.DB, logger *zap.SugaredLogger) *ItemRepository {
 }
 
 var (
+	// ErrUserMissing is returned when the referenced user does not exist.
 	ErrUserMissing    = errors.New("user missing")
+	// ErrBadItemType is returned when the item type is invalid.
 	ErrBadItemType    = errors.New("bad item type")
+	// ErrRetryableDB is returned for retryable database errors.
 	ErrRetryableDB    = errors.New("retryable db error")
+	// ErrSchemaMismatch is returned when the database schema is incompatible with the query.
 	ErrSchemaMismatch = errors.New("schema mismatch")
+	// ErrNotFound is returned when an item can't be found.
 	ErrNotFound       = errors.New("item not found")
+	// ErrDB is returned for non-specific database errors.
 	ErrDB             = errors.New("db error")
 )
 
+// SetItem creates or updates an item and returns the stored record.
+// The context controls cancellation and deadlines.
 func (r *ItemRepository) SetItem(ctx context.Context, item models.Item) (models.Item, error) {
 	var out models.Item
 	err := r.db.QueryRowContext(ctx, insertItemQuery,
@@ -143,6 +153,8 @@ func (r *ItemRepository) SetItem(ctx context.Context, item models.Item) (models.
 	return out, nil
 }
 
+// DeleteItem deletes an item and returns the resulting record.
+// The context controls cancellation and deadlines.
 func (r *ItemRepository) DeleteItem(ctx context.Context, itemID uuid.UUID, userID uuid.UUID) (out models.Item, err error) {
 	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
@@ -226,6 +238,8 @@ func (r *ItemRepository) DeleteItem(ctx context.Context, itemID uuid.UUID, userI
 	return out, nil
 }
 
+// GetItem returns a single item for the given user.
+// The context controls cancellation and deadlines.
 func (r *ItemRepository) GetItem(ctx context.Context, itemID uuid.UUID, userID uuid.UUID) (models.Item, error) {
 	var item models.Item
 
@@ -249,6 +263,8 @@ func (r *ItemRepository) GetItem(ctx context.Context, itemID uuid.UUID, userID u
 	return item, nil
 }
 
+// GetAllItems returns all items for the given user.
+// The context controls cancellation and deadlines.
 func (r *ItemRepository) GetAllItems(ctx context.Context, userID uuid.UUID) ([]models.Item, error) {
 	rows, err := r.db.QueryContext(ctx, getAllItemsQuery, userID)
 	if err != nil {
@@ -287,6 +303,8 @@ func (r *ItemRepository) GetAllItems(ctx context.Context, userID uuid.UUID) ([]m
 	return items, nil
 }
 
+// GetChangesSince returns items updated after the given revision and the latest user revision.
+// The context controls cancellation and deadlines.
 func (r *ItemRepository) GetChangesSince(ctx context.Context, userID uuid.UUID, since int64) (items []models.Item, latestRev int64, err error) {
 	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{
 		ReadOnly: true,

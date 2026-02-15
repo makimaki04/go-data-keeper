@@ -1,3 +1,4 @@
+// Package clientapi provides an HTTP client for the server API.
 package clientapi
 
 import (
@@ -21,6 +22,7 @@ const (
 	syncURL       = "/api/user/sync/changes"
 )
 
+// HTTPClient implements client-side access to the server HTTP API.
 type HTTPClient struct {
 	baseURL string
 	client  *resty.Client
@@ -28,6 +30,7 @@ type HTTPClient struct {
 	logger  *zap.SugaredLogger
 }
 
+// NewHTTPClient creates an HTTPClient configured for the given baseURL.
 func NewHTTPClient(baseURL string, logger *zap.SugaredLogger) *HTTPClient {
 	logger = logger.With("component", "http client")
 	client := resty.New()
@@ -51,6 +54,9 @@ func parseAPIError(body []byte) string {
 	return strings.TrimSpace(string(body))
 }
 
+// Register registers a new user using the server API.
+// The context controls cancellation and deadlines.
+// Register returns an error if the request fails, the response status is not OK, or the response body can't be decoded.
 func (c *HTTPClient) Register(ctx context.Context, login string, password string) (contract.RegisterResponse, error) {
 	if len(password) < 8 {
 		c.logger.Infow("password length < 8",
@@ -125,6 +131,9 @@ func (c *HTTPClient) Register(ctx context.Context, login string, password string
 	return result, nil
 }
 
+// Login authenticates a user using the server API.
+// The context controls cancellation and deadlines.
+// Login returns an error if the request fails, the response status is not OK, or the response body can't be decoded.
 func (c *HTTPClient) Login(ctx context.Context, login string, password string) (contract.LoginResponse, error) {
 	url := c.baseURL + loginURL
 	c.logger.Infow("login request started",
@@ -191,6 +200,9 @@ func (c *HTTPClient) Login(ctx context.Context, login string, password string) (
 	return result, nil
 }
 
+// SetItem creates or updates an item with the given ID using the server API.
+// The context controls cancellation and deadlines.
+// SetItem returns an error if the client has no token, the request fails, the response status is not OK, or the response body can't be decoded.
 func (c *HTTPClient) SetItem(ctx context.Context, itemID string, item contract.SetItemRequest) (contract.SetItemResponse, error) {
 	if ok := c.CheckToken(); !ok {
 		return contract.SetItemResponse{}, fmt.Errorf("missing token, please login")
@@ -262,6 +274,9 @@ func (c *HTTPClient) SetItem(ctx context.Context, itemID string, item contract.S
 	return res, nil
 }
 
+// DeleteItem deletes an item with the given ID using the server API.
+// The context controls cancellation and deadlines.
+// DeleteItem returns an error if the client has no token, the request fails, the response status is not OK, or the response body can't be decoded.
 func (c *HTTPClient) DeleteItem(ctx context.Context, itemID string) (contract.DeleteItemResponse, error) {
 	if ok := c.CheckToken(); !ok {
 		return contract.DeleteItemResponse{}, fmt.Errorf("missing token, please login")
@@ -331,6 +346,9 @@ func (c *HTTPClient) DeleteItem(ctx context.Context, itemID string) (contract.De
 	return res, nil
 }
 
+// SyncChanges fetches items changed since lastSyncedRev using the server API.
+// The context controls cancellation and deadlines.
+// SyncChanges returns an error if the client has no token, lastSyncedRev is negative, the request fails, the response status is not OK, or the response body can't be decoded.
 func (c *HTTPClient) SyncChanges(ctx context.Context, lastSyncedRev int64) (contract.SyncItemsResponse, error) {
 	if ok := c.CheckToken(); !ok {
 		return contract.SyncItemsResponse{}, fmt.Errorf("missing token, please login")
@@ -401,14 +419,17 @@ func (c *HTTPClient) SyncChanges(ctx context.Context, lastSyncedRev int64) (cont
 	return res, nil
 }
 
+// GetURL returns the configured API base URL.
 func (c *HTTPClient) GetURL() string {
 	return c.baseURL
 }
 
+// SetToken sets the bearer token used for authenticated requests.
 func (c *HTTPClient) SetToken(token string) {
 	c.token = token
 }
 
+// CheckToken reports whether a bearer token is currently configured.
 func (c *HTTPClient) CheckToken() bool {
 	return c.token != ""
 }

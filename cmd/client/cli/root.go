@@ -1,6 +1,7 @@
 /*
 Copyright © 2026 Dima <goodd214080@gmail.com>
 */
+// Package cli defines the client command-line interface.
 package cli
 
 import (
@@ -74,8 +75,8 @@ func defaultLocalPaths() (state string, vault string) {
 	return filepath.Join(base, "state.json"), filepath.Join(base, "vault.json")
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
+// Execute runs the root command.
+// Execute exits the process with status 1 if command execution fails.
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {

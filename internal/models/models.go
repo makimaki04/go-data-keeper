@@ -1,3 +1,4 @@
+// Package models defines domain models used by the service and persistence layers.
 package models
 
 import (
@@ -9,6 +10,7 @@ import (
 	"github.com/makimaki04/go-data-keeper.git/pkg/contract"
 )
 
+// User represents a registered user account.
 type User struct {
 	ID           uuid.UUID
 	Login        string
@@ -18,6 +20,7 @@ type User struct {
 	CreatedAt    time.Time
 }
 
+// Item represents an encrypted item stored for a user.
 type Item struct {
 	ID         uuid.UUID
 	UserID     uuid.UUID
@@ -31,6 +34,7 @@ type Item struct {
 	UpdatedAt  sql.NullTime
 }
 
+// ConvertToItemsDTO converts domain items into transport DTOs.
 func ConvertToItemsDTO(items []Item) []contract.ItemDTO {
 	resp := make([]contract.ItemDTO, 0, len(items))
 
