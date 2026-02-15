@@ -370,7 +370,7 @@ func (c *HTTPClient) SyncChanges(ctx context.Context, lastSyncedRev int64) (cont
 	r.SetHeader("Authorization", fmt.Sprintf("Bearer %s", c.token)).
 		SetQueryParam("since", strconv.FormatInt(lastSyncedRev, 10)).
 		SetContext(ctx)
-		
+
 	resp, err := r.Get(url)
 	if err != nil {
 		c.logger.Errorw("sync changes request failed",

@@ -153,8 +153,12 @@ func TestGetChangesSince_Validation(t *testing.T) {
 
 	svc := &service.Service{
 		Authorization: fakeAuth{
-			registerFn: func(ctx context.Context, login, password string) (service.AuthData, error) { return service.AuthData{}, nil },
-			loginFn:    func(ctx context.Context, login, password string) (service.AuthData, error) { return service.AuthData{}, nil },
+			registerFn: func(ctx context.Context, login, password string) (service.AuthData, error) {
+				return service.AuthData{}, nil
+			},
+			loginFn: func(ctx context.Context, login, password string) (service.AuthData, error) {
+				return service.AuthData{}, nil
+			},
 		},
 		Items: fakeItems{getChangesFn: func(ctx context.Context, userID uuid.UUID, since int64) ([]models.Item, int64, error) {
 			return nil, 0, nil
@@ -195,8 +199,12 @@ func TestGetChangesSince_OK_WithAuthMiddleware(t *testing.T) {
 
 	svc := &service.Service{
 		Authorization: fakeAuth{
-			registerFn: func(ctx context.Context, login, password string) (service.AuthData, error) { return service.AuthData{}, nil },
-			loginFn:    func(ctx context.Context, login, password string) (service.AuthData, error) { return service.AuthData{}, nil },
+			registerFn: func(ctx context.Context, login, password string) (service.AuthData, error) {
+				return service.AuthData{}, nil
+			},
+			loginFn: func(ctx context.Context, login, password string) (service.AuthData, error) {
+				return service.AuthData{}, nil
+			},
 		},
 		Items: fakeItems{getChangesFn: func(ctx context.Context, uid uuid.UUID, since int64) ([]models.Item, int64, error) {
 			if uid != userID {
@@ -248,4 +256,3 @@ func TestGetChangesSince_OK_WithAuthMiddleware(t *testing.T) {
 		t.Fatalf("unexpected response: %#v", out)
 	}
 }
-

@@ -21,7 +21,7 @@ func InitDB(dsn string, logger *zap.SugaredLogger) (*sql.DB, error) {
 		logger.Errorw("run migration error", "error", err)
 
 		return nil, fmt.Errorf("run migration error: %w", err)
-	}	
+	}
 
 	logger.Info("migrations successfully started")
 

@@ -229,4 +229,3 @@ func TestGetItem_DecryptsEnvelope(t *testing.T) {
 		t.Fatalf("unexpected envelope: %#v", got)
 	}
 }
-

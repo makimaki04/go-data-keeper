@@ -144,4 +144,3 @@ func TestStore_LoadVault_CorruptJSON_ReturnsError(t *testing.T) {
 		t.Fatalf("expected error for corrupt json")
 	}
 }
-

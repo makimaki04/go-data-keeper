@@ -44,7 +44,7 @@ func NewAuthRepository(db *sql.DB, logger *zap.SugaredLogger) *AuthRepository {
 
 var (
 	// ErrUserExists is returned when a user with the same login already exists.
-	ErrUserExists   = errors.New("user already exists")
+	ErrUserExists = errors.New("user already exists")
 	// ErrUserNotFound is returned when a user can't be found by login.
 	ErrUserNotFound = errors.New("user not found")
 )

@@ -112,17 +112,17 @@ func NewItemRepository(db *sql.DB, logger *zap.SugaredLogger) *ItemRepository {
 
 var (
 	// ErrUserMissing is returned when the referenced user does not exist.
-	ErrUserMissing    = errors.New("user missing")
+	ErrUserMissing = errors.New("user missing")
 	// ErrBadItemType is returned when the item type is invalid.
-	ErrBadItemType    = errors.New("bad item type")
+	ErrBadItemType = errors.New("bad item type")
 	// ErrRetryableDB is returned for retryable database errors.
-	ErrRetryableDB    = errors.New("retryable db error")
+	ErrRetryableDB = errors.New("retryable db error")
 	// ErrSchemaMismatch is returned when the database schema is incompatible with the query.
 	ErrSchemaMismatch = errors.New("schema mismatch")
 	// ErrNotFound is returned when an item can't be found.
-	ErrNotFound       = errors.New("item not found")
+	ErrNotFound = errors.New("item not found")
 	// ErrDB is returned for non-specific database errors.
-	ErrDB             = errors.New("db error")
+	ErrDB = errors.New("db error")
 )
 
 // SetItem creates or updates an item and returns the stored record.
