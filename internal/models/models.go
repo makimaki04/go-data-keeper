@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/makimaki04/go-data-keeper.git/cmd/pkg/contract"
+	"github.com/makimaki04/go-data-keeper.git/pkg/contract"
 )
 
 type User struct {

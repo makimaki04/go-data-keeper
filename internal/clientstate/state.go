@@ -1,11 +1,12 @@
 package clientstate
 
 import (
-	"github.com/makimaki04/go-data-keeper.git/cmd/pkg/contract"
+	"github.com/makimaki04/go-data-keeper.git/pkg/contract"
 )
 
 type State struct {
 	ServerURL     string          `json:"server_url"`
+	UserID        string          `json:"user_id"`
 	JWTToken      string          `json:"jwt_token"`
 	ExpiresAt     string          `json:"expires_at"`
 	KDFSalt       []byte          `json:"kdf_salt"`

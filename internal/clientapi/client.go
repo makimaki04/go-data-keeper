@@ -5,18 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/makimaki04/go-data-keeper.git/cmd/pkg/contract"
+	"github.com/makimaki04/go-data-keeper.git/pkg/contract"
 	"go.uber.org/zap"
 )
 
 const (
 	registerURL   = "/api/user/register"
 	loginURL      = "/api/user/login"
-	setItemUrl    = "/api/user/items/"
-	deleteItemUrl = "/api/user/items/"
+	setItemURL    = "/api/user/items/"
+	deleteItemURL = "/api/user/items/"
+	syncURL       = "/api/user/sync/changes"
 )
 
 type HTTPClient struct {
@@ -58,6 +60,13 @@ func (c *HTTPClient) Register(ctx context.Context, login string, password string
 		return contract.RegisterResponse{}, fmt.Errorf("password should be at least 8 characters")
 	}
 
+	url := c.baseURL + registerURL
+	c.logger.Infow("register request started",
+		"op", "client.register",
+		"url", url,
+		"login", login,
+	)
+
 	r := c.client.R()
 
 	r.SetHeader("Content-Type", "application/json").
@@ -67,34 +76,63 @@ func (c *HTTPClient) Register(ctx context.Context, login string, password string
 			Password: password,
 		})
 
-	resp, err := r.Post(c.baseURL + registerURL)
+	resp, err := r.Post(url)
 	if err != nil {
-		c.logger.Infow("register request return error",
+		c.logger.Errorw("register request failed",
 			"op", "client.register",
-			"url", c.baseURL+registerURL,
+			"url", url,
+			"login", login,
 			"err", err,
 		)
-		return contract.RegisterResponse{}, fmt.Errorf("failed to register user %s: %v", login, err)
+		return contract.RegisterResponse{}, fmt.Errorf("failed to register user %s: %w", login, err)
 	}
 
 	if resp.StatusCode() != http.StatusOK {
-		return contract.RegisterResponse{}, fmt.Errorf("something went wrong. bad status: %s", resp.Status())
+		msg := parseAPIError(resp.Body())
+		c.logger.Errorw("register bad status",
+			"op", "client.register",
+			"url", url,
+			"login", login,
+			"status", resp.Status(),
+			"error_msg", msg,
+		)
+		if msg == "" {
+			msg = resp.Status()
+		}
+		return contract.RegisterResponse{}, fmt.Errorf("register failed: %s", msg)
 	}
 
 	var result contract.RegisterResponse
 	if err := json.Unmarshal(resp.Body(), &result); err != nil {
-		c.logger.Errorw("umurshal resp body error",
+		c.logger.Errorw("unmarshal resp body error",
 			"op", "client.register",
+			"url", url,
+			"login", login,
+			"err", err,
 		)
-		return contract.RegisterResponse{}, err
+		return contract.RegisterResponse{}, fmt.Errorf("unmarshal register response: %w", err)
 	}
 
 	c.token = result.JWTToken
+
+	c.logger.Infow("register request succeeded",
+		"op", "client.register",
+		"url", url,
+		"login", login,
+		"user_id", result.UserID,
+	)
 
 	return result, nil
 }
 
 func (c *HTTPClient) Login(ctx context.Context, login string, password string) (contract.LoginResponse, error) {
+	url := c.baseURL + loginURL
+	c.logger.Infow("login request started",
+		"op", "client.login",
+		"url", url,
+		"login", login,
+	)
+
 	r := c.client.R()
 
 	r.SetHeader("Content-Type", "application/json").
@@ -104,29 +142,51 @@ func (c *HTTPClient) Login(ctx context.Context, login string, password string) (
 			Password: password,
 		})
 
-	resp, err := r.Post(c.baseURL + loginURL)
+	resp, err := r.Post(url)
 	if err != nil {
-		c.logger.Infow("login request return error",
+		c.logger.Errorw("login request failed",
 			"op", "client.login",
-			"url", c.baseURL+loginURL,
+			"url", url,
+			"login", login,
 			"err", err,
 		)
-		return contract.LoginResponse{}, fmt.Errorf("failed to login user %s: %v", login, err)
+		return contract.LoginResponse{}, fmt.Errorf("failed to login user %s: %w", login, err)
 	}
 
 	if resp.StatusCode() != http.StatusOK {
-		return contract.LoginResponse{}, fmt.Errorf("something went wrong. bad status: %s", resp.Status())
+		msg := parseAPIError(resp.Body())
+		c.logger.Errorw("login bad status",
+			"op", "client.login",
+			"url", url,
+			"login", login,
+			"status", resp.Status(),
+			"error_msg", msg,
+		)
+		if msg == "" {
+			msg = resp.Status()
+		}
+		return contract.LoginResponse{}, fmt.Errorf("login failed: %s", msg)
 	}
 
 	var result contract.LoginResponse
 	if err := json.Unmarshal(resp.Body(), &result); err != nil {
-		c.logger.Errorw("umurshal resp body error",
+		c.logger.Errorw("unmarshal resp body error",
 			"op", "client.login",
+			"url", url,
+			"login", login,
+			"err", err,
 		)
-		return contract.LoginResponse{}, err
+		return contract.LoginResponse{}, fmt.Errorf("unmarshal login response: %w", err)
 	}
 
 	c.token = result.JWTToken
+
+	c.logger.Infow("login request succeeded",
+		"op", "client.login",
+		"url", url,
+		"login", login,
+		"user_id", result.UserID,
+	)
 
 	return result, nil
 }
@@ -136,7 +196,7 @@ func (c *HTTPClient) SetItem(ctx context.Context, itemID string, item contract.S
 		return contract.SetItemResponse{}, fmt.Errorf("missing token, please login")
 	}
 
-	url := c.baseURL + setItemUrl + itemID
+	url := c.baseURL + setItemURL + itemID
 	c.logger.Infow("set item request started",
 		"op", "client.set_item",
 		"url", url,
@@ -207,7 +267,7 @@ func (c *HTTPClient) DeleteItem(ctx context.Context, itemID string) (contract.De
 		return contract.DeleteItemResponse{}, fmt.Errorf("missing token, please login")
 	}
 
-	url := c.baseURL + deleteItemUrl + itemID
+	url := c.baseURL + deleteItemURL + itemID
 	c.logger.Infow("delete item request started",
 		"op", "client.delete_item",
 		"url", url,
@@ -266,6 +326,76 @@ func (c *HTTPClient) DeleteItem(ctx context.Context, itemID string) (contract.De
 		"item_id", itemID,
 		"updated_rev", res.Item.UpdatedRev,
 		"deleted", res.Item.Deleted,
+	)
+
+	return res, nil
+}
+
+func (c *HTTPClient) SyncChanges(ctx context.Context, lastSyncedRev int64) (contract.SyncItemsResponse, error) {
+	if ok := c.CheckToken(); !ok {
+		return contract.SyncItemsResponse{}, fmt.Errorf("missing token, please login")
+	}
+
+	if lastSyncedRev < 0 {
+		return contract.SyncItemsResponse{}, fmt.Errorf("lastSyncedRev can't be negative")
+	}
+
+	url := c.baseURL + syncURL
+	c.logger.Infow("sync changes request started",
+		"op", "client.sync_changes",
+		"url", url,
+		"since", lastSyncedRev,
+	)
+
+	r := c.client.R()
+
+	r.SetHeader("Authorization", fmt.Sprintf("Bearer %s", c.token)).
+		SetQueryParam("since", strconv.FormatInt(lastSyncedRev, 10)).
+		SetContext(ctx)
+		
+	resp, err := r.Get(url)
+	if err != nil {
+		c.logger.Errorw("sync changes request failed",
+			"op", "client.sync_changes",
+			"url", url,
+			"since", lastSyncedRev,
+			"err", err,
+		)
+		return contract.SyncItemsResponse{}, fmt.Errorf("sync changes request failed: %w", err)
+	}
+
+	if resp.StatusCode() != http.StatusOK {
+		msg := parseAPIError(resp.Body())
+		c.logger.Errorw("sync changes bad status",
+			"op", "client.sync_changes",
+			"url", url,
+			"since", lastSyncedRev,
+			"status", resp.Status(),
+			"error_msg", msg,
+		)
+		if msg == "" {
+			msg = resp.Status()
+		}
+		return contract.SyncItemsResponse{}, fmt.Errorf("sync changes failed: %s", msg)
+	}
+
+	var res contract.SyncItemsResponse
+	if err := json.Unmarshal(resp.Body(), &res); err != nil {
+		c.logger.Errorw("unmarshal resp body error",
+			"op", "client.sync_changes",
+			"url", url,
+			"since", lastSyncedRev,
+			"err", err,
+		)
+		return contract.SyncItemsResponse{}, fmt.Errorf("unmarshal sync changes response: %w", err)
+	}
+
+	c.logger.Infow("sync changes request succeeded",
+		"op", "client.sync_changes",
+		"url", url,
+		"since", lastSyncedRev,
+		"latest_rev", res.LatestRev,
+		"items_count", len(res.Items),
 	)
 
 	return res, nil

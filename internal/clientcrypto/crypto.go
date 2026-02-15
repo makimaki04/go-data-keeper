@@ -6,7 +6,7 @@ import (
 	"crypto/rand"
 	"fmt"
 
-	"github.com/makimaki04/go-data-keeper.git/cmd/pkg/contract"
+	"github.com/makimaki04/go-data-keeper.git/pkg/contract"
 	"golang.org/x/crypto/argon2"
 )
 

@@ -12,11 +12,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/makimaki04/go-data-keeper.git/cmd/pkg/contract"
 	"github.com/makimaki04/go-data-keeper.git/internal/middleware"
 	"github.com/makimaki04/go-data-keeper.git/internal/models"
 	"github.com/makimaki04/go-data-keeper.git/internal/repository"
 	"github.com/makimaki04/go-data-keeper.git/internal/service"
+	"github.com/makimaki04/go-data-keeper.git/pkg/contract"
 	"go.uber.org/zap"
 )
 
@@ -112,7 +112,7 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Authorization", fmt.Sprintf("Bearer %s", authData.JWT.AccessToken))
 	w.WriteHeader(http.StatusOK)
 	encodeResponse(w, contract.RegisterResponse{
-		ID:        authData.ID.String(),
+		UserID:    authData.ID.String(),
 		JWTToken:  authData.JWT.AccessToken,
 		ExpiresAt: authData.JWT.ExpiresAt.Format(time.UnixDate),
 		KDFSalt:   authData.KDFSalt,
@@ -161,6 +161,8 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Authorization", fmt.Sprintf("Bearer %s", authData.JWT.AccessToken))
 	w.WriteHeader(http.StatusOK)
 	encodeResponse(w, contract.LoginResponse{
+		UserID:    authData.ID.String(),
+		Login:     login,
 		JWTToken:  authData.JWT.AccessToken,
 		ExpiresAt: authData.JWT.ExpiresAt.Format(time.UnixDate),
 		KDFSalt:   authData.KDFSalt,

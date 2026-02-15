@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/makimaki04/go-data-keeper.git/cmd/pkg/contract"
 	"github.com/makimaki04/go-data-keeper.git/internal/clientcrypto"
 	"github.com/makimaki04/go-data-keeper.git/internal/clientstate"
+	"github.com/makimaki04/go-data-keeper.git/pkg/contract"
 	"go.uber.org/zap"
 )
 
@@ -25,7 +25,7 @@ type IClient interface {
 	Login(ctx context.Context, login string, password string) (contract.LoginResponse, error)
 	SetItem(ctx context.Context, itemId string, item contract.SetItemRequest) (contract.SetItemResponse, error)
 	DeleteItem(ctx context.Context, itemID string) (contract.DeleteItemResponse, error)
-	// SyncChanges(ctx context.Context) (contract.SyncItemsResponse, error)
+	SyncChanges(ctx context.Context, lastSyncedRev int64) (contract.SyncItemsResponse, error)
 	GetURL() string
 }
 
@@ -65,11 +65,39 @@ func (a *App) Register(login string, password string) error {
 		"op", "app.register",
 		"login", login,
 		"url", a.Client.GetURL(),
-		"user_id", resp.ID,
+		"user_id", resp.UserID,
 	)
+
+	oldState, err := a.Store.LoadState()
+	if err != nil {
+		a.logger.Errorw("load state failed",
+			"op", "app.register",
+			"login", login,
+			"err", err,
+		)
+		return err
+	}
+
+	if oldState.UserID != "" && oldState.UserID != resp.UserID {
+		err := a.Store.WipeVault()
+		if err != nil {
+			a.logger.Errorw("wipe vault failed",
+				"op", "app.register",
+				"login", login,
+				"err", err,
+			)
+			return err
+		}
+		a.logger.Infow("vault successfully wiped",
+			"op", "app.register",
+			"login", login,
+			"user_id", resp.UserID,
+		)
+	}
 
 	data := clientstate.State{
 		ServerURL:     a.Client.GetURL(),
+		UserID:        resp.UserID,
 		JWTToken:      resp.JWTToken,
 		ExpiresAt:     resp.ExpiresAt,
 		KDFSalt:       resp.KDFSalt,
@@ -89,7 +117,31 @@ func (a *App) Register(login string, password string) error {
 	a.logger.Infow("register completed",
 		"op", "app.register",
 		"login", login,
-		"user_id", resp.ID,
+		"user_id", resp.UserID,
+	)
+
+	a.logger.Infow("sync started",
+		"op", "app.sync_changes",
+		"trigger", "app.register",
+		"login", login,
+		"user_id", resp.UserID,
+	)
+
+	if err := a.SyncChanges(); err != nil {
+		a.logger.Errorw("sync changes failed",
+			"op", "app.sync_changes",
+			"trigger", "app.register",
+			"login", login,
+			"err", err,
+		)
+		return err
+	}
+
+	a.logger.Infow("sync completed",
+		"op", "app.sync_changes",
+		"trigger", "app.register",
+		"login", login,
+		"user_id", resp.UserID,
 	)
 
 	return nil
@@ -126,6 +178,26 @@ func (a *App) Login(login string, password string) error {
 		return err
 	}
 
+	if state.UserID != "" && state.UserID != resp.UserID {
+		if err := a.Store.WipeVault(); err != nil {
+			a.logger.Errorw("wipe vault failed",
+				"op", "app.login",
+				"login", login,
+				"err", err,
+			)
+			return err
+		}
+
+		a.logger.Infow("vault successfully wiped",
+			"op", "app.login",
+			"login", login,
+			"user_id", resp.UserID,
+		)
+
+		state.LastSyncedRev = 0
+	}
+
+	state.UserID = resp.UserID
 	state.ServerURL = a.Client.GetURL()
 	state.JWTToken = resp.JWTToken
 	state.ExpiresAt = resp.ExpiresAt
@@ -143,6 +215,30 @@ func (a *App) Login(login string, password string) error {
 
 	a.logger.Infow("login completed",
 		"op", "app.login",
+		"login", login,
+		"url", a.Client.GetURL(),
+	)
+
+	a.logger.Infow("sync started",
+		"op", "app.sync_changes",
+		"trigger", "app.login",
+		"login", login,
+		"url", a.Client.GetURL(),
+	)
+
+	if err := a.SyncChanges(); err != nil {
+		a.logger.Errorw("sync changes failed",
+			"op", "app.sync_changes",
+			"trigger", "app.login",
+			"login", login,
+			"err", err,
+		)
+		return err
+	}
+
+	a.logger.Infow("sync completed",
+		"op", "app.sync_changes",
+		"trigger", "app.login",
 		"login", login,
 		"url", a.Client.GetURL(),
 	)
@@ -401,8 +497,22 @@ func (a *App) DeleteItem(id uuid.UUID) error {
 func (a *App) GetList(all bool, itemType string, deleted bool) ([]contract.ItemDTO, error) {
 	var items []contract.ItemDTO
 
+	a.logger.Infow("get list started",
+		"op", "app.get_list",
+		"all", all,
+		"type", itemType,
+		"deleted", deleted,
+	)
+
 	vault, err := a.Store.LoadVault()
 	if err != nil {
+		a.logger.Errorw("load vault failed",
+			"op", "app.get_list",
+			"all", all,
+			"type", itemType,
+			"deleted", deleted,
+			"err", err,
+		)
 		return []contract.ItemDTO{}, err
 	}
 
@@ -419,6 +529,13 @@ func (a *App) GetList(all bool, itemType string, deleted bool) ([]contract.ItemD
 			}
 		}
 
+		a.logger.Infow("get list completed",
+			"op", "app.get_list",
+			"all", all,
+			"type", itemType,
+			"deleted", deleted,
+			"items_count", len(items),
+		)
 		return items, nil
 	}
 
@@ -437,6 +554,13 @@ func (a *App) GetList(all bool, itemType string, deleted bool) ([]contract.ItemD
 			}
 		}
 
+		a.logger.Infow("get list completed",
+			"op", "app.get_list",
+			"all", all,
+			"type", itemType,
+			"deleted", deleted,
+			"items_count", len(items),
+		)
 		return items, nil
 	}
 
@@ -447,6 +571,13 @@ func (a *App) GetList(all bool, itemType string, deleted bool) ([]contract.ItemD
 			}
 		}
 
+		a.logger.Infow("get list completed",
+			"op", "app.get_list",
+			"all", all,
+			"type", itemType,
+			"deleted", deleted,
+			"items_count", len(items),
+		)
 		return items, nil
 	}
 
@@ -456,41 +587,96 @@ func (a *App) GetList(all bool, itemType string, deleted bool) ([]contract.ItemD
 		}
 	}
 
+	a.logger.Infow("get list completed",
+		"op", "app.get_list",
+		"all", all,
+		"type", itemType,
+		"deleted", deleted,
+		"items_count", len(items),
+	)
 	return items, nil
 }
 
 func (a *App) GetItem(masterPassword string, itemID uuid.UUID) (ItemEnvelope, error) {
 	if masterPassword == "" {
-		return ItemEnvelope{}, fmt.Errorf("master password is required")
+		err := fmt.Errorf("master password is required")
+		a.logger.Errorw("get item failed: empty master password",
+			"op", "app.get_item",
+			"item_id", itemID,
+			"err", err,
+		)
+		return ItemEnvelope{}, err
 	}
 
 	id := itemID.String()
 
+	a.logger.Infow("get item started",
+		"op", "app.get_item",
+		"item_id", id,
+	)
+
 	vault, err := a.Store.LoadVault()
 	if err != nil {
+		a.logger.Errorw("load vault failed",
+			"op", "app.get_item",
+			"item_id", id,
+			"err", err,
+		)
 		return ItemEnvelope{}, err
 	}
 
 	item, ok := vault.Store[id]
 	if !ok {
-		return ItemEnvelope{}, fmt.Errorf("item not found: %s", id)
+		err := fmt.Errorf("item not found: %s", id)
+		a.logger.Errorw("get item failed: not found",
+			"op", "app.get_item",
+			"item_id", id,
+			"err", err,
+		)
+		return ItemEnvelope{}, err
 	}
 
 	if item.Deleted == true {
-		return ItemEnvelope{}, fmt.Errorf("item deleted")
+		err := fmt.Errorf("item deleted")
+		a.logger.Errorw("get item failed: item deleted",
+			"op", "app.get_item",
+			"item_id", id,
+			"type", item.Type,
+			"err", err,
+		)
+		return ItemEnvelope{}, err
 	}
 
 	if len(item.Ciphertext) == 0 || len(item.Nonce) == 0 {
-		return ItemEnvelope{}, fmt.Errorf("no encrypted payload")
+		err := fmt.Errorf("no encrypted payload")
+		a.logger.Errorw("get item failed: missing encrypted payload",
+			"op", "app.get_item",
+			"item_id", id,
+			"type", item.Type,
+			"err", err,
+		)
+		return ItemEnvelope{}, err
 	}
 
 	userState, err := a.Store.LoadState()
 	if err != nil {
+		a.logger.Errorw("load state failed",
+			"op", "app.get_item",
+			"item_id", id,
+			"type", item.Type,
+			"err", err,
+		)
 		return ItemEnvelope{}, err
 	}
 
 	key, err := clientcrypto.DeriveKey(masterPassword, userState.KDFSalt, userState.KDFParams)
 	if err != nil {
+		a.logger.Errorw("derive key failed",
+			"op", "app.get_item",
+			"item_id", id,
+			"type", item.Type,
+			"err", err,
+		)
 		return ItemEnvelope{}, err
 	}
 
@@ -498,17 +684,133 @@ func (a *App) GetItem(masterPassword string, itemID uuid.UUID) (ItemEnvelope, er
 
 	plaintext, err := clientcrypto.Decrypt(key, item.Ciphertext, item.Nonce, aad)
 	if err != nil {
+		a.logger.Errorw("decrypt failed",
+			"op", "app.get_item",
+			"item_id", id,
+			"type", item.Type,
+			"err", err,
+		)
 		return ItemEnvelope{}, err
 	}
 
 	var env ItemEnvelope
 	if err := json.Unmarshal(plaintext, &env); err != nil {
+		a.logger.Errorw("envelope unmarshal failed",
+			"op", "app.get_item",
+			"item_id", id,
+			"type", item.Type,
+			"err", err,
+		)
 		return ItemEnvelope{}, err
 	}
 
 	if env.Type != item.Type {
-		return ItemEnvelope{}, fmt.Errorf("data integrity error: envelope type mismatch")
+		err := fmt.Errorf("data integrity error: envelope type mismatch")
+		a.logger.Errorw("get item failed: envelope type mismatch",
+			"op", "app.get_item",
+			"item_id", id,
+			"type", item.Type,
+			"envelope_type", env.Type,
+			"err", err,
+		)
+		return ItemEnvelope{}, err
 	}
 
+	a.logger.Infow("get item completed",
+		"op", "app.get_item",
+		"item_id", id,
+		"type", item.Type,
+		"has_meta", len(env.Meta) > 0,
+		"has_meta_text", env.MetaText != "",
+		"data_len", len(env.Data),
+	)
 	return env, nil
+}
+
+func (a *App) SyncChanges() error {
+	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
+	defer cancel()
+
+	a.logger.Infow("sync changes started",
+		"op", "app.sync_changes",
+		"url", a.Client.GetURL(),
+	)
+
+	state, err := a.Store.LoadState()
+	if err != nil {
+		a.logger.Errorw("load state failed",
+			"op", "app.sync_changes",
+			"err", err,
+		)
+		return err
+	}
+
+	lastRev := state.LastSyncedRev
+	a.logger.Infow("sync changes fetching",
+		"op", "app.sync_changes",
+		"url", a.Client.GetURL(),
+		"since", lastRev,
+	)
+	changes, err := a.Client.SyncChanges(ctx, lastRev)
+	if err != nil {
+		a.logger.Errorw("sync changes request failed",
+			"op", "app.sync_changes",
+			"url", a.Client.GetURL(),
+			"since", lastRev,
+			"err", err,
+		)
+		return err
+	}
+
+	vault, err := a.Store.LoadVault()
+	if err != nil {
+		a.logger.Errorw("load vault failed",
+			"op", "app.sync_changes",
+			"err", err,
+		)
+		return err
+	}
+
+	itemsStore := vault.Store
+
+	for _, item := range changes.Items {
+		if item.Deleted == true {
+			item.Ciphertext = nil
+			item.Nonce = nil
+			item.AAD = nil
+		}
+
+		itemsStore[item.ID.String()] = item
+	}
+
+	vault.Store = itemsStore
+	if err := a.Store.SaveVault(vault); err != nil {
+		a.logger.Errorw("save vault failed",
+			"op", "app.sync_changes",
+			"latest_rev", changes.LatestRev,
+			"items_count", len(changes.Items),
+			"err", err,
+		)
+		return err
+	}
+
+	state.LastSyncedRev = changes.LatestRev
+	if err := a.Store.SaveState(state); err != nil {
+		a.logger.Errorw("save state failed",
+			"op", "app.sync_changes",
+			"latest_rev", changes.LatestRev,
+			"err", err,
+		)
+		return err
+	}
+
+	a.logger.Infow("sync changes completed",
+		"op", "app.sync_changes",
+		"url", a.Client.GetURL(),
+		"since", lastRev,
+		"latest_rev", changes.LatestRev,
+		"items_count", len(changes.Items),
+	)
+
+	return nil
 }

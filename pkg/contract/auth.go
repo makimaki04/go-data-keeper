@@ -12,7 +12,7 @@ type RegisterRequest struct {
 }
 
 type RegisterResponse struct {
-	ID        string `json:"id"`
+	UserID    string `json:"id"`
 	JWTToken  string `json:"jwt_token"`
 	ExpiresAt string `json:"expires_at"`
 	KDFSalt   []byte `json:"kdf_salt"`
@@ -71,6 +71,8 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
+	UserID    string `json:"user_id"`
+	Login     string `json:"login"`
 	JWTToken  string `json:"jwt_token"`
 	ExpiresAt string `json:"expires_at"`
 	KDFSalt   []byte `json:"kdf_salt"`

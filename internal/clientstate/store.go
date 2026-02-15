@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/makimaki04/go-data-keeper.git/cmd/pkg/contract"
+	"github.com/makimaki04/go-data-keeper.git/pkg/contract"
 	"go.uber.org/zap"
 )
 
@@ -146,6 +146,10 @@ func (s *Store) LoadVault() (Vault, error) {
 		return Vault{}, err
 	}
 
+	if vault.Store == nil {
+		vault.Store = make(map[string]contract.ItemDTO)
+	}
+
 	return vault, nil
 }
 
@@ -184,4 +188,27 @@ func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 	}
 
 	return nil
+}
+
+func (s *Store) WipeVault() error {
+	var vault Vault
+	vault.Store = make(map[string]contract.ItemDTO)
+
+	jsonData, err := json.MarshalIndent(vault, "", "  ")
+	if err != nil {
+		s.logger.Errorw("data json.marshal error", "op", "vault.wipe_vault")
+		return err
+	}
+
+	if err := atomicWriteFile(s.vaultFile.path, jsonData, 0600); err != nil {
+		s.logger.Errorw("atomic write file error",
+			"op", "vault.wipe_vault",
+			"file_path", s.vaultFile.path,
+			"err", err,
+		)
+		return err
+	}
+
+	return nil
+
 }

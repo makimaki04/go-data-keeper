@@ -6,6 +6,7 @@ package cli
 import (
 	"context"
 	"os"
+	"path/filepath"
 
 	"github.com/makimaki04/go-data-keeper.git/internal/clientapi"
 	"github.com/makimaki04/go-data-keeper.git/internal/clientapp"
@@ -58,6 +59,21 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+func defaultLocalPaths() (state string, vault string) {
+	dir, err := os.UserConfigDir()
+	if err != nil || dir == "" {
+		home, herr := os.UserHomeDir()
+		if herr != nil || home == "" {
+			dir = "."
+		} else {
+			dir = home
+		}
+	}
+
+	base := filepath.Join(dir, "gophkeeper")
+	return filepath.Join(base, "state.json"), filepath.Join(base, "vault.json")
+}
+
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
@@ -68,23 +84,18 @@ func Execute() {
 }
 
 func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.client.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
 	rootCmd.AddCommand(registerCmd)
 	rootCmd.AddCommand(loginCmd)
 	rootCmd.AddCommand(setCmd)
 	rootCmd.AddCommand(deleteCmd)
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(getCmd)
+	rootCmd.AddCommand(syncCmd)
+	rootCmd.AddCommand(versionCmd)
 
+	defState, defVault := defaultLocalPaths()
 	rootCmd.PersistentFlags().StringVar(&serverURL, "server", "http://127.0.0.1:8080", "Server URL")
-	rootCmd.PersistentFlags().StringVar(&statePath, "state", "D:\\prog\\data\\gophkeeper\\state.json", "State file path")
-	rootCmd.PersistentFlags().StringVar(&vaultPath, "vault", "D:\\prog\\data\\gophkeeper\\vault.json", "Vault file path")
+	rootCmd.PersistentFlags().StringVar(&statePath, "state", defState, "State file path")
+	rootCmd.PersistentFlags().StringVar(&vaultPath, "vault", defVault, "Vault file path")
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

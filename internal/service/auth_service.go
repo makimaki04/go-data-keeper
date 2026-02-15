@@ -9,9 +9,9 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
-	"github.com/makimaki04/go-data-keeper.git/cmd/pkg/contract"
 	"github.com/makimaki04/go-data-keeper.git/internal/models"
 	"github.com/makimaki04/go-data-keeper.git/internal/repository"
+	"github.com/makimaki04/go-data-keeper.git/pkg/contract"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
