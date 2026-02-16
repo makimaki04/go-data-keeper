@@ -1,3 +1,4 @@
+// Package logger provides zap logger initialization from configuration.
 package logger
 
 import (
@@ -9,12 +10,12 @@ import (
 	"go.uber.org/zap"
 )
 
+// NewLogger builds a sugared zap logger from the JSON configuration at cfgPath.
+// NewLogger returns an error if the configuration can't be read, decoded, or used to build a logger.
 func NewLogger(cfgPath string) (*zap.SugaredLogger, error) {
-	fmt.Println("loading logger config from: ", cfgPath)
-
 	cfgJSON, err := os.ReadFile(cfgPath)
 	if err != nil {
-		fmt.Println("couldn't logger config file from: ", cfgPath)
+		fmt.Println("couldn't read logger config from: ", cfgPath)
 		return nil, err
 	}
 
@@ -22,6 +23,7 @@ func NewLogger(cfgPath string) (*zap.SugaredLogger, error) {
 
 	if err := json.Unmarshal(cfgJSON, &cfg); err != nil {
 		fmt.Println("logger config json unmarshal error", err)
+		return nil, err
 	}
 
 	for _, path := range cfg.OutputPaths {
@@ -39,10 +41,11 @@ func NewLogger(cfgPath string) (*zap.SugaredLogger, error) {
 	logger, err := cfg.Build()
 	if err != nil {
 		fmt.Println("logger build error: ", err)
+		return nil, err
 	}
 
 	sugar := logger.Sugar()
 
-	sugar.Info("logger successfully initialized")
+	sugar.Info("logger successfully init")
 	return sugar, nil
 }

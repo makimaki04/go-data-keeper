@@ -1,0 +1,5 @@
+ALTER TABLE items
+DROP CONSTRAINT IF EXISTS items_pkey;
+
+ALTER TABLE items
+ADD CONSTRAINT items_pkey PRIMARY KEY (user_id, id);
